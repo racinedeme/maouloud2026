@@ -49,6 +49,24 @@ STORAGE_KEYS = {
     "ziar": "maouloud2026-ziar",
 }
 
+# Modules a collecteur account's permissions can be restricted to. A storage
+# key can satisfy more than one module (e.g. "members" is written by both the
+# Encaissement and Cotisations screens). Keys not listed here (e.g. the
+# dashboard's "synthese" report_caisse) are writable by any admin/collecteur
+# regardless of per-module permissions.
+MODULES = ["encaissement", "cotisations", "mobilemoney", "bonnesvolontes", "ziar", "depenses", "bus"]
+STORAGE_KEY_TO_MODULES = {
+    "maouloud2026-members": ["encaissement", "cotisations"],
+    "maouloud2026-mobilemoney": ["mobilemoney"],
+    "maouloud2026-bonnesvolontes": ["bonnesvolontes"],
+    "maouloud2026-donsnature": ["bonnesvolontes"],
+    "maouloud2026-ziar": ["ziar"],
+    "maouloud2026-depenses": ["depenses"],
+    "maouloud2026-buses": ["bus"],
+    "maouloud2026-voyageurs": ["bus"],
+    "maouloud2026-bustransport": ["bus"],
+}
+
 # ---------------------------------------------------------------------------
 # Storage
 # ---------------------------------------------------------------------------
@@ -79,9 +97,14 @@ def init_db():
             " salt TEXT NOT NULL,"
             " display_name TEXT NOT NULL,"
             " role TEXT NOT NULL,"
+            " permissions TEXT NOT NULL DEFAULT '[]',"
             " created_at TEXT NOT NULL"
             ")"
         )
+        # Migration for databases created before per-module permissions existed.
+        user_cols = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
+        if "permissions" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN permissions TEXT NOT NULL DEFAULT '[]'")
         conn.execute(
             "CREATE TABLE IF NOT EXISTS audit_log ("
             " id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -156,12 +179,16 @@ def verify_password(password: str, salt: str, expected_hash: str) -> bool:
 def get_user(username: str):
     with db() as conn:
         row = conn.execute(
-            "SELECT username, password_hash, salt, display_name, role FROM users WHERE username=?",
+            "SELECT username, password_hash, salt, display_name, role, permissions FROM users WHERE username=?",
             (username,),
         ).fetchone()
         if not row:
             return None
-        return {"username": row[0], "password_hash": row[1], "salt": row[2], "display_name": row[3], "role": row[4]}
+        try:
+            perms = json.loads(row[5]) if row[5] else []
+        except (json.JSONDecodeError, TypeError):
+            perms = []
+        return {"username": row[0], "password_hash": row[1], "salt": row[2], "display_name": row[3], "role": row[4], "permissions": perms}
 
 
 # ---------------------------------------------------------------------------
@@ -177,6 +204,7 @@ def create_session(user: dict) -> str:
         "username": user["username"],
         "role": user["role"],
         "display_name": user["display_name"],
+        "permissions": user.get("permissions", []),
         "expiry": time.time() + SESSION_HOURS * 3600,
     }
     return token
@@ -201,6 +229,20 @@ def require_writer(request: Request) -> dict:
     if s["role"] not in ("admin", "collecteur"):
         raise HTTPException(status_code=403, detail="Compte en lecture seule — écriture non autorisée")
     return s
+
+
+def check_module_permission(session: dict, storage_key: str):
+    """For a collecteur account, verify the key's module is in their allowed list.
+    Empty permissions list means unrestricted (legacy/default full access).
+    Admins always pass, enforced by the caller only invoking this for collecteurs."""
+    if session["role"] != "collecteur":
+        return
+    perms = session.get("permissions") or []
+    if not perms:
+        return
+    allowed_modules = STORAGE_KEY_TO_MODULES.get(storage_key, [])
+    if allowed_modules and not any(m in perms for m in allowed_modules):
+        raise HTTPException(status_code=403, detail="Module non autorisé pour ce compte")
 
 
 def require_admin(request: Request) -> dict:
@@ -230,11 +272,16 @@ class CreateUserBody(BaseModel):
     username: str
     password: str
     display_name: str
-    role: str  # 'admin' | 'collecteur'
+    role: str  # 'admin' | 'collecteur' | 'consultation'
+    permissions: list[str] = []  # only meaningful for role='collecteur'; empty = unrestricted
 
 
 class ResetPasswordBody(BaseModel):
     password: str
+
+
+class SetPermissionsBody(BaseModel):
+    permissions: list[str]
 
 
 @app.on_event("startup")
@@ -254,7 +301,10 @@ def login(body: LoginBody, response: Response):
         max_age=int(SESSION_HOURS * 3600),
     )
     log_action(user["username"], "login")
-    return {"ok": True, "username": user["username"], "display_name": user["display_name"], "role": user["role"]}
+    return {
+        "ok": True, "username": user["username"], "display_name": user["display_name"],
+        "role": user["role"], "permissions": user["permissions"],
+    }
 
 
 @app.post("/api/logout")
@@ -281,6 +331,7 @@ def me(request: Request):
         "display_name": s["display_name"],
         "is_admin": s["role"] == "admin",
         "account_role": s["role"],
+        "permissions": s.get("permissions", []),
     }
 
 
@@ -295,6 +346,7 @@ def get_store(key: str):
 @app.put("/api/store/{key}")
 def put_store(key: str, body: StoreBody, request: Request):
     s = require_writer(request)
+    check_module_permission(s, key)
     kv_set(key, body.value)
     log_action(s["username"], "update", key)
     return {"key": key, "ok": True}
@@ -305,12 +357,16 @@ def list_users(request: Request):
     require_admin(request)
     with db() as conn:
         rows = conn.execute(
-            "SELECT username, display_name, role, created_at FROM users ORDER BY created_at"
+            "SELECT username, display_name, role, permissions, created_at FROM users ORDER BY created_at"
         ).fetchall()
-    return [
-        {"username": r[0], "display_name": r[1], "role": r[2], "created_at": r[3]}
-        for r in rows
-    ]
+    out = []
+    for r in rows:
+        try:
+            perms = json.loads(r[3]) if r[3] else []
+        except (json.JSONDecodeError, TypeError):
+            perms = []
+        out.append({"username": r[0], "display_name": r[1], "role": r[2], "permissions": perms, "created_at": r[4]})
+    return out
 
 
 @app.post("/api/users")
@@ -323,13 +379,29 @@ def create_user(body: CreateUserBody, request: Request):
         raise HTTPException(status_code=400, detail="Rôle invalide")
     if get_user(username):
         raise HTTPException(status_code=409, detail="Ce nom d'utilisateur existe déjà")
+    perms = [p for p in body.permissions if p in MODULES] if body.role == "collecteur" else []
     h, salt = hash_password(body.password)
     with db() as conn:
         conn.execute(
-            "INSERT INTO users (username, password_hash, salt, display_name, role, created_at) VALUES (?,?,?,?,?,?)",
-            (username, h, salt, body.display_name.strip() or username, body.role, now_iso()),
+            "INSERT INTO users (username, password_hash, salt, display_name, role, permissions, created_at) VALUES (?,?,?,?,?,?,?)",
+            (username, h, salt, body.display_name.strip() or username, body.role, json.dumps(perms), now_iso()),
         )
     log_action(s["username"], "create_user", username)
+    return {"ok": True}
+
+
+@app.put("/api/users/{username}/permissions")
+def set_permissions(username: str, body: SetPermissionsBody, request: Request):
+    s = require_admin(request)
+    username = username.strip().lower()
+    user = get_user(username)
+    if not user:
+        raise HTTPException(status_code=404, detail="Compte introuvable")
+    perms = [p for p in body.permissions if p in MODULES]
+    with db() as conn:
+        conn.execute("UPDATE users SET permissions=? WHERE username=?", (json.dumps(perms), username))
+    # Live sessions for that user keep their old permissions until they log back in.
+    log_action(s["username"], "set_permissions", username)
     return {"ok": True}
 
 

@@ -247,6 +247,26 @@ const desiredKioskTab = urlParams.get('tab');
 const kioskMode = urlParams.get('kiosk') === '1';
 if(desiredKioskTab) mainTab = desiredKioskTab;
 
+/* ---------- Permissions par module (comptes collecteur) ----------
+   Un compte admin a toujours accès à tout. Un compte consultation n'a
+   jamais accès en écriture. Un compte collecteur avec une liste de
+   permissions vide est non restreint (comportement historique) ; avec
+   une liste non vide, seuls les modules cochés sont accessibles. */
+const GATED_MODULES = ['encaissement','cotisations','mobilemoney','bonnesvolontes','ziar','depenses','bus'];
+const MODULE_LABELS = {
+  encaissement:'Encaissement', cotisations:'Cotisations', mobilemoney:'Wave / Orange Money',
+  bonnesvolontes:'Bonnes volontés', ziar:'Ziar', depenses:'Dépenses', bus:'Bus & voyageurs'
+};
+function hasModulePermission(moduleKey){
+  if(!GATED_MODULES.includes(moduleKey)) return true;
+  if(!currentUser) return false;
+  if(currentUser.account_role === 'admin') return true;
+  if(currentUser.account_role === 'consultation') return false;
+  const perms = currentUser.permissions || [];
+  if(perms.length === 0) return true;
+  return perms.includes(moduleKey);
+}
+
 function fmt(n){ return (n||0).toLocaleString('fr-FR'); }
 function statusOf(m){ if(m.montant_verse<=0) return 'unpaid'; if(m.montant_verse>=m.montant_attendu) return 'paid'; return 'partial'; }
 
@@ -443,6 +463,14 @@ async function apiResetPassword(username, password){
     return {ok:false, error:j.detail||'Erreur'};
   }catch(e){ return {ok:false, error:'Erreur réseau'}; }
 }
+async function apiSetPermissions(username, permissions){
+  try{
+    const res = await fetch('/api/users/'+encodeURIComponent(username)+'/permissions', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({permissions})});
+    if(res.ok) return {ok:true};
+    const j = await res.json().catch(()=>({}));
+    return {ok:false, error:j.detail||'Erreur'};
+  }catch(e){ return {ok:false, error:'Erreur réseau'}; }
+}
 async function apiAudit(){
   try{ const res = await fetch('/api/audit'); if(res.ok) return await res.json(); }catch(e){}
   return [];
@@ -516,11 +544,11 @@ function depJustifieTotal(){ return depenses.reduce((a,x)=>a+x.justifie,0); }
 function synthLines(){
   const gs = globalCotisStats();
   const totalCotis = gs.verse + mmTotal();
-  const totalCotisBV = totalCotis + bvTotal() + ziarTotal();
+  const totalCotisBV = totalCotis + bvTotal();
   const totalCaisse = (synthese.report_caisse||0) + totalCotisBV;
   const totalDep = depTotal();
   const solde = totalCaisse - totalDep;
-  return {gs, totalCotis, bv:bvTotal(), ziar:ziarTotal(), totalCotisBV, totalCaisse, totalDep, solde};
+  return {gs, totalCotis, bv:bvTotal(), totalCotisBV, totalCaisse, totalDep, solde};
 }
 
 /* ---------- Shell ---------- */
@@ -538,9 +566,67 @@ const MAIN_TABS = [
 
 function render(){
   const app = document.getElementById('app');
+
+  /* Mode kiosque : écran de connexion obligatoire tant qu'aucun compte n'est
+     connecté — évite qu'un poste dédié affiche des données en accédant
+     simplement à l'URL sans identifiants. */
+  if(kioskMode && !currentUser){
+    app.innerHTML = `
+      <div class="masthead">
+        <div>
+          <div class="eyebrow">Maouloud 2026 · Poste dédié</div>
+          <h1>Connexion requise</h1>
+          <p class="sub">Ce poste est réservé — connectez-vous avec votre compte pour continuer.</p>
+        </div>
+      </div>
+      <div class="panel" style="max-width:380px;margin:30px auto 0;">
+        <h2>Connexion</h2>
+        <p class="lede">Identifiant et mot de passe fournis par le comité.</p>
+        <div class="addform open" style="margin-top:4px;">
+          <input type="text" id="login-username" placeholder="Nom d'utilisateur" autocomplete="username"/>
+          <input type="password" id="login-password" placeholder="Mot de passe" autocomplete="current-password"/>
+          <button class="btn primary" id="loginSubmitBtn" style="width:100%;">Connexion</button>
+        </div>
+      </div>
+    `;
+    const submit = async ()=>{
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value;
+      if(!username || !password){ showToast("Nom d'utilisateur et mot de passe requis"); return; }
+      const res = await apiLogin(username, password);
+      if(!res){ showToast('Identifiants incorrects'); return; }
+      currentUser = {username: res.username, display_name: res.display_name, is_admin: res.role==='admin', account_role: res.role, permissions: res.permissions||[]};
+      role = (res.role==='admin' || res.role==='collecteur') ? 'comite' : 'membre';
+      render();
+    };
+    document.getElementById('loginSubmitBtn').onclick = submit;
+    document.getElementById('login-password').addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
+    return;
+  }
+
+  /* Mode kiosque : le compte connecté doit avoir la permission du module assigné à ce poste. */
+  if(kioskMode && currentUser && !hasModulePermission(mainTab)){
+    const label = (MAIN_TABS.find(t=>t.key===mainTab)||{}).label || mainTab;
+    app.innerHTML = `
+      <div class="masthead">
+        <div>
+          <div class="eyebrow">Maouloud 2026 · Poste dédié</div>
+          <h1>Accès refusé</h1>
+          <p class="sub">Le compte ${currentUser.display_name} n'a pas accès au module « ${label} ».</p>
+        </div>
+        <div class="role-toggle" style="align-items:center;gap:4px;">
+          <button id="logoutBtn">Déconnexion</button>
+        </div>
+      </div>
+      <div class="panel"><p class="lede">Demandez à un administrateur d'ajouter ce module aux permissions de ce compte, ou connectez-vous avec le bon compte.</p></div>
+    `;
+    document.getElementById('logoutBtn').onclick = async ()=>{ await apiLogout(); currentUser=null; role='membre'; render(); };
+    return;
+  }
+
   const gs = globalCotisStats();
   const isAdmin = !!(currentUser && currentUser.is_admin);
-  const visibleTabs = MAIN_TABS.filter(t=>t.roles.includes(role) && (!t.adminOnly || isAdmin));
+  const visibleTabs = MAIN_TABS.filter(t=>t.roles.includes(role) && (!t.adminOnly || isAdmin) && (role!=='comite' || hasModulePermission(t.key)));
   const tabDef = MAIN_TABS.find(t=>t.key===mainTab);
   if(!tabDef){
     mainTab = kioskMode && desiredKioskTab ? desiredKioskTab : 'dashboard';
@@ -589,7 +675,7 @@ function render(){
     if(!username || !password){ showToast('Nom d\'utilisateur et mot de passe requis'); return; }
     const res = await apiLogin(username, password);
     if(!res){ showToast('Identifiants incorrects'); return; }
-    currentUser = {username: res.username, display_name: res.display_name, is_admin: res.role==='admin', account_role: res.role};
+    currentUser = {username: res.username, display_name: res.display_name, is_admin: res.role==='admin', account_role: res.role, permissions: res.permissions||[]};
     role = (res.role==='admin' || res.role==='collecteur') ? 'comite' : 'membre';
     loginFormOpen = false;
     render();
@@ -610,6 +696,10 @@ function render(){
   }
   if(activeTabDef.adminOnly && !isAdmin){
     panel.innerHTML = `<div class="panel"><h2>${activeTabDef.label}</h2><p class="lede">Accès réservé aux administrateurs.</p></div>`;
+    return;
+  }
+  if(role==='comite' && !hasModulePermission(mainTab)){
+    panel.innerHTML = `<div class="panel"><h2>${activeTabDef.label}</h2><p class="lede">Votre compte n'a pas la permission d'accéder à ce module. Contactez un administrateur.</p></div>`;
     return;
   }
   if(mainTab==='dashboard') renderDashboard(panel);
@@ -654,8 +744,7 @@ function renderDashboard(panel){
         <tr><td class="lbl">Cotisations Wave / Orange Money</td><td class="val num">${fmt(mmTotal())}</td></tr>
         <tr class="total"><td class="lbl">Total cotisations</td><td class="val num">${fmt(s.totalCotis)}</td></tr>
         <tr><td class="lbl">Bonnes volontés</td><td class="val num">${fmt(s.bv)}</td></tr>
-        <tr><td class="lbl">Ziar</td><td class="val num">${fmt(s.ziar)}</td></tr>
-        <tr class="total"><td class="lbl">Cotisations + Bonnes volontés + Ziar</td><td class="val num">${fmt(s.totalCotisBV)}</td></tr>
+        <tr class="total"><td class="lbl">Cotisations + Bonnes volontés</td><td class="val num">${fmt(s.totalCotisBV)}</td></tr>
         <tr class="total"><td class="lbl">Total caisse</td><td class="val num">${fmt(s.totalCaisse)}</td></tr>
         <tr><td class="lbl">Dépenses (avances décaissées)</td><td class="val num">${fmt(s.totalDep)}</td></tr>
         <tr class="solde"><td class="lbl">Solde de caisse</td><td class="val num">${fmt(s.solde)}</td></tr>
@@ -1367,6 +1456,8 @@ function wireBusCards(panel){
 let usersCache = [];
 let auditCache = [];
 let userAddOpen = false;
+let newUserRole = 'collecteur';
+let permsEditingUser = null; // username currently showing its permissions editor, or null
 
 async function renderComptes(panel){
   panel.innerHTML = `<div class="panel"><h2>Comptes</h2><p class="lede">Chargement...</p></div>`;
@@ -1378,32 +1469,65 @@ function auditLabel(action){
   const map = {login:'Connexion', logout:'Déconnexion', update:'Modification de données', create_user:'Création de compte', delete_user:'Suppression de compte', reset_password:'Réinitialisation de mot de passe'};
   return map[action] || action;
 }
+function moduleCheckboxes(idPrefix, checkedList){
+  const checked = checkedList || [];
+  return GATED_MODULES.map(m=>`
+    <label style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--paper);cursor:pointer;">
+      <input type="checkbox" id="${idPrefix}-${m}" data-module="${m}" ${checked.includes(m)?'checked':''}/> ${MODULE_LABELS[m]}
+    </label>`).join('');
+}
 function renderComptesContent(panel){
   panel.innerHTML = `
     <div class="panel">
       <h2>Comptes</h2>
       <p class="lede">Comptes nominatifs pour le comité, les collecteurs, et la consultation en lecture seule. Connexions et modifications sont tracées dans le journal ci-dessous.</p>
       <div class="toolbar"><button class="btn primary" id="userAddBtn">+ Créer un compte</button></div>
-      <div class="addform ${userAddOpen?'open':''}" id="userAddForm">
-        <input type="text" id="u-username" placeholder="Identifiant (ex. fatou)"/>
-        <input type="text" id="u-display" placeholder="Nom affiché (ex. Fatou DIOP)"/>
-        <input type="password" id="u-password" placeholder="Mot de passe (4+ caractères)"/>
-        <select id="u-role"><option value="collecteur">Collecteur</option><option value="admin">Administrateur</option><option value="consultation">Consultation (lecture seule)</option></select>
-        <button class="btn primary" id="userSaveBtn">Créer</button>
-        <button class="btn ghost" id="userCancelBtn">Annuler</button>
+      <div class="addform ${userAddOpen?'open':''}" id="userAddForm" style="flex-direction:column;align-items:stretch;">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <input type="text" id="u-username" placeholder="Identifiant (ex. fatou)" style="flex:1;min-width:130px;"/>
+          <input type="text" id="u-display" placeholder="Nom affiché (ex. Fatou DIOP)" style="flex:1;min-width:130px;"/>
+          <input type="password" id="u-password" placeholder="Mot de passe (4+ caractères)" style="flex:1;min-width:130px;"/>
+          <select id="u-role">
+            <option value="collecteur" ${newUserRole==='collecteur'?'selected':''}>Collecteur</option>
+            <option value="admin" ${newUserRole==='admin'?'selected':''}>Administrateur</option>
+            <option value="consultation" ${newUserRole==='consultation'?'selected':''}>Consultation (lecture seule)</option>
+          </select>
+        </div>
+        ${newUserRole==='collecteur' ? `
+        <div style="margin-top:10px;">
+          <div style="font-size:11px;color:var(--ink-soft);margin-bottom:6px;">Modules autorisés pour ce compte — laisser tout décoché pour un accès complet à la saisie.</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">${moduleCheckboxes('newuser', [])}</div>
+        </div>` : ''}
+        <div style="margin-top:10px;display:flex;gap:8px;">
+          <button class="btn primary" id="userSaveBtn">Créer</button>
+          <button class="btn ghost" id="userCancelBtn">Annuler</button>
+        </div>
       </div>
       <div class="mlist" style="margin-top:14px;">
         ${usersCache.map((u,i)=>`
-        <div class="mrow" style="grid-template-columns:28px 1.4fr 1fr 1fr 140px;">
+        <div class="mrow" style="grid-template-columns:28px 1.4fr 1fr 1fr 190px;">
           <div class="idx num">${i+1}</div>
           <div class="name">${u.display_name}<div class="cat-badge">@${u.username}</div></div>
-          <div class="field"><div class="l">Rôle</div><div class="v">${u.role==='admin'?'Administrateur':u.role==='collecteur'?'Collecteur':'Consultation'}</div></div>
+          <div class="field"><div class="l">Rôle</div><div class="v">${u.role==='admin'?'Administrateur':u.role==='collecteur'?'Collecteur':'Consultation'}</div>
+            ${u.role==='collecteur' ? `<div class="cat-badge">${u.permissions && u.permissions.length ? u.permissions.map(m=>MODULE_LABELS[m]||m).join(', ') : 'Accès complet'}</div>` : ''}
+          </div>
           <div class="field"><div class="l">Créé le</div><div class="v" style="font-size:11.5px;">${u.created_at.slice(0,10)}</div></div>
-          <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center;">
+          <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center;flex-wrap:wrap;">
+            ${u.role==='collecteur' ? `<button class="btn sm ghost" data-editperms="${u.username}">Modules</button>` : ''}
             <button class="btn sm ghost" data-resetpw="${u.username}" title="Réinitialiser le mot de passe">Mot de passe</button>
             ${u.username!==currentUser.username ? `<button class="btn danger-ghost" data-deluser="${u.username}">Suppr.</button>` : ''}
           </div>
-        </div>`).join('')}
+        </div>
+        ${permsEditingUser===u.username ? `
+        <div class="addform open" style="flex-direction:column;align-items:stretch;">
+          <div style="font-size:11px;color:var(--ink-soft);margin-bottom:6px;">Modules autorisés pour @${u.username} — laisser tout décoché pour un accès complet.</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">${moduleCheckboxes('editperm', u.permissions||[])}</div>
+          <div style="margin-top:10px;display:flex;gap:8px;">
+            <button class="btn primary sm" data-saveperms="${u.username}">Enregistrer</button>
+            <button class="btn ghost sm" id="permsCancelBtn">Annuler</button>
+          </div>
+        </div>` : ''}
+        `).join('')}
       </div>
 
       <div class="section-gap">
@@ -1418,6 +1542,8 @@ function renderComptesContent(panel){
   `;
   document.getElementById('userAddBtn').onclick = ()=>{ userAddOpen=!userAddOpen; renderComptesContent(panel); };
   const cancel = document.getElementById('userCancelBtn'); if(cancel) cancel.onclick = ()=>{ userAddOpen=false; renderComptesContent(panel); };
+  const roleSelEl = document.getElementById('u-role');
+  if(roleSelEl) roleSelEl.onchange = (e)=>{ newUserRole = e.target.value; renderComptesContent(panel); };
   const save = document.getElementById('userSaveBtn');
   if(save) save.onclick = async ()=>{
     const username = document.getElementById('u-username').value.trim();
@@ -1425,10 +1551,14 @@ function renderComptesContent(panel){
     const password = document.getElementById('u-password').value;
     const roleSel = document.getElementById('u-role').value;
     if(!username || !password){ showToast('Identifiant et mot de passe requis'); return; }
-    const res = await apiCreateUser({username, display_name, password, role:roleSel});
+    let permissions = [];
+    if(roleSel==='collecteur'){
+      permissions = GATED_MODULES.filter(m=>{ const el = document.getElementById('newuser-'+m); return el && el.checked; });
+    }
+    const res = await apiCreateUser({username, display_name, password, role:roleSel, permissions});
     if(!res.ok){ showToast(res.error); return; }
     showToast('Compte créé');
-    userAddOpen=false;
+    userAddOpen=false; newUserRole='collecteur';
     usersCache = await apiListUsers();
     renderComptesContent(panel);
   };
@@ -1450,12 +1580,29 @@ function renderComptesContent(panel){
       showToast('Mot de passe réinitialisé');
     };
   });
+  panel.querySelectorAll('[data-editperms]').forEach(b=>{
+    b.onclick = ()=>{ permsEditingUser = (permsEditingUser===b.dataset.editperms) ? null : b.dataset.editperms; renderComptesContent(panel); };
+  });
+  const permsCancel = document.getElementById('permsCancelBtn');
+  if(permsCancel) permsCancel.onclick = ()=>{ permsEditingUser = null; renderComptesContent(panel); };
+  panel.querySelectorAll('[data-saveperms]').forEach(b=>{
+    b.onclick = async ()=>{
+      const username = b.dataset.saveperms;
+      const permissions = GATED_MODULES.filter(m=>{ const el = document.getElementById('editperm-'+m); return el && el.checked; });
+      const res = await apiSetPermissions(username, permissions);
+      if(!res.ok){ showToast(res.error); return; }
+      showToast('Modules mis à jour — le compte devra se reconnecter pour en tenir compte');
+      permsEditingUser = null;
+      usersCache = await apiListUsers();
+      renderComptesContent(panel);
+    };
+  });
 }
 
 (async function init(){
   const me = await apiMe();
   if(me.username){
-    currentUser = {username: me.username, display_name: me.display_name, is_admin: me.is_admin, account_role: me.account_role};
+    currentUser = {username: me.username, display_name: me.display_name, is_admin: me.is_admin, account_role: me.account_role, permissions: me.permissions||[]};
     role = me.role;
   }
   await loadAll();
