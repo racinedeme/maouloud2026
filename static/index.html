@@ -1,0 +1,1291 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Maouloud 2026 — Gestion de l'association</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#123B2F">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FBF8F1; --paper-raised:#FFFFFF; --ink:#22302B; --ink-soft:#5B6D63;
+    --primary:#1F5C4A; --primary-dark:#123B2F; --primary-soft:#E4EEE7;
+    --accent:#C98A2C; --accent-soft:#F3E3C0;
+    --danger:#B54A3D; --danger-soft:#F4DFDA;
+    --line:#E4DCC8;
+    --shadow: 0 1px 2px rgba(34,48,43,0.06), 0 6px 20px rgba(34,48,43,0.06);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh;}
+  .num{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;}
+  #app{max-width:1120px;margin:0 auto;padding:20px 16px 64px;}
+
+  .masthead{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px;flex-wrap:wrap;}
+  .masthead h1{font-family:'Fraunces',serif;font-weight:600;font-size:25px;letter-spacing:-0.01em;margin:0 0 4px;color:var(--primary-dark);}
+  .masthead .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:0.14em;color:var(--accent);font-weight:700;margin-bottom:6px;}
+  .masthead p.sub{margin:0;color:var(--ink-soft);font-size:13.5px;}
+
+  .role-toggle{display:flex;background:var(--paper-raised);border:1px solid var(--line);border-radius:10px;padding:3px;box-shadow:var(--shadow);flex-shrink:0;}
+  .role-toggle button{border:none;background:transparent;padding:8px 14px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink-soft);font-family:inherit;transition:all .15s;}
+  .role-toggle button.active{background:var(--primary);color:#fff;}
+  .role-toggle button:not(.active):hover{background:var(--primary-soft);color:var(--primary-dark);}
+
+  /* Top module nav */
+  .mainnav{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:14px;-webkit-overflow-scrolling:touch;}
+  .mainnav .navbtn{flex:0 0 auto;padding:9px 14px;border-radius:10px;background:var(--paper-raised);border:1px solid var(--line);cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-soft);white-space:nowrap;}
+  .mainnav .navbtn.active{background:var(--primary-dark);color:#fff;border-color:var(--primary-dark);}
+  .mainnav .navbtn:not(.active):hover{background:var(--primary-soft);color:var(--primary-dark);}
+
+  .panel{background:var(--paper-raised);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:18px;}
+  .panel h2{font-family:'Fraunces',serif;font-size:19px;margin:0 0 4px;color:var(--primary-dark);}
+  .panel .lede{color:var(--ink-soft);font-size:13px;margin:0 0 16px;}
+  .section-gap{margin-top:26px;padding-top:20px;border-top:1px solid var(--line);}
+
+  /* Sub tabs (cotisations by category) */
+  .subtabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:14px;}
+  .subtab{flex:0 0 auto;padding:8px 13px;border-radius:9px 9px 0 0;background:var(--paper);border:1px solid var(--line);border-bottom:none;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--ink-soft);position:relative;top:1px;}
+  .subtab.active{color:var(--primary-dark);box-shadow:0 -2px 0 var(--accent) inset;background:var(--paper-raised);}
+  .subtab .n{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:var(--primary-soft);color:var(--primary-dark);font-size:9.5px;margin-right:5px;font-weight:700;}
+  .subpanel{border:1px solid var(--line);border-radius:0 10px 10px 10px;padding:14px;background:var(--paper-raised);}
+
+  .cat-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;}
+  .cat-head h3{font-family:'Fraunces',serif;font-size:16px;margin:0;color:var(--primary-dark);}
+  .cat-head .base-amount{font-size:11.5px;color:var(--ink-soft);}
+  .cat-stats{display:flex;gap:12px;font-size:11.5px;color:var(--ink-soft);flex-wrap:wrap;}
+  .cat-stats b{color:var(--ink);}
+
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .search-wrap{position:relative;flex:1;min-width:200px;}
+  .search-wrap input{width:100%;padding:9px 12px 9px 32px;border-radius:9px;border:1px solid var(--line);font-size:13px;font-family:inherit;background:var(--paper);}
+  .search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.45;}
+  select.filter{padding:9px 10px;border-radius:9px;border:1px solid var(--line);font-size:13px;background:var(--paper);font-family:inherit;color:var(--ink);}
+  .btn{padding:9px 14px;border-radius:9px;border:1px solid var(--line);background:var(--paper);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--ink);}
+  .btn:hover{background:var(--primary-soft);}
+  .btn.primary{background:var(--primary);color:#fff;border-color:var(--primary);}
+  .btn.primary:hover{background:var(--primary-dark);}
+  .btn.ghost{border-color:transparent;color:var(--ink-soft);}
+  .btn.danger-ghost{border-color:transparent;color:var(--danger);font-size:12px;padding:5px 9px;}
+  .btn.sm{padding:6px 10px;font-size:12px;}
+
+  .mlist{display:flex;flex-direction:column;gap:8px;}
+  .mrow{display:grid;grid-template-columns:28px 1.6fr 1fr 1fr 1fr 90px;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--paper);}
+  .mrow .idx{color:var(--ink-soft);font-size:12px;}
+  .mrow .name{font-weight:600;font-size:13.5px;}
+  .mrow .cat-badge{display:inline-block;font-size:10.5px;color:var(--ink-soft);margin-top:2px;}
+  .mrow .field .l{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-soft);margin-bottom:2px;}
+  .mrow .field .v{font-size:13.5px;}
+  .mrow input[type=number], .mrow input[type=text]{width:100%;padding:6px 8px;border-radius:7px;border:1px solid var(--line);font-family:'IBM Plex Mono',monospace;font-size:13px;background:#fff;}
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:99px;font-size:11px;font-weight:700;white-space:nowrap;justify-self:end;}
+  .badge.paid{background:var(--primary-soft);color:var(--primary-dark);}
+  .badge.partial{background:var(--accent-soft);color:#7A5518;}
+  .badge.unpaid{background:var(--danger-soft);color:var(--danger);}
+  .badge.pos{background:var(--primary-soft);color:var(--primary-dark);}
+  .badge.neg{background:var(--danger-soft);color:var(--danger);}
+  .badge.zero{background:#EEE9DC;color:var(--ink-soft);}
+  .obs{grid-column:1 / -1;font-size:11.5px;color:var(--ink-soft);padding-left:38px;margin-top:-4px;}
+  .empty{padding:36px 12px;text-align:center;color:var(--ink-soft);font-size:13.5px;}
+
+  .addform{display:none;gap:10px;flex-wrap:wrap;margin-top:12px;padding:14px;border:1px dashed var(--line);border-radius:10px;background:var(--paper);}
+  .addform.open{display:flex;}
+  .addform input, .addform select{padding:8px 10px;border-radius:8px;border:1px solid var(--line);font-size:13px;font-family:inherit;}
+  .addform input[type=text]{flex:1;min-width:130px;}
+
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:99px;font-size:13px;opacity:0;transition:all .25s;pointer-events:none;box-shadow:var(--shadow);z-index:50;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .note{font-size:12px;color:var(--ink-soft);margin-top:18px;line-height:1.6;}
+  .note b{color:var(--ink);}
+
+  /* Dashboard */
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;}
+  .kpi-card{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:#fff;border-radius:14px;padding:16px;}
+  .kpi-card.alt{background:var(--paper);color:var(--ink);border:1px solid var(--line);}
+  .kpi-card .v{font-size:21px;font-weight:700;}
+  .kpi-card .l{font-size:11px;opacity:0.85;margin-top:3px;text-transform:uppercase;letter-spacing:0.06em;}
+  .kpi-card.alt .l{opacity:0.65;}
+  .gauge{height:8px;background:rgba(34,48,43,0.1);border-radius:99px;overflow:hidden;margin-top:14px;}
+  .gauge-fill{height:100%;background:var(--accent);border-radius:99px;transition:width .4s ease;}
+  .gauge.on-dark{background:rgba(255,255,255,0.22);}
+
+  .synth-table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  .synth-table tr{border-bottom:1px solid var(--line);}
+  .synth-table td{padding:9px 4px;}
+  .synth-table td.lbl{color:var(--ink-soft);}
+  .synth-table td.val{text-align:right;}
+  .synth-table tr.total td{font-weight:700;color:var(--primary-dark);border-top:2px solid var(--primary-dark);border-bottom:none;padding-top:12px;}
+  .synth-table tr.solde td{font-weight:700;color:var(--accent);font-size:15px;}
+  .synth-table input[type=number]{width:130px;padding:6px 8px;border-radius:7px;border:1px solid var(--line);font-family:'IBM Plex Mono',monospace;font-size:13px;text-align:right;}
+
+  .self-lookup{background:var(--primary-soft);border-radius:12px;padding:16px;margin-bottom:20px;}
+  .self-lookup h3{margin:0 0 10px;font-family:'Fraunces',serif;font-size:15px;color:var(--primary-dark);}
+  .self-result{margin-top:12px;background:#fff;border-radius:10px;padding:12px;}
+
+  /* Encaissement */
+  .enc-search{position:relative;margin-bottom:16px;}
+  .enc-search input{width:100%;padding:14px 14px 14px 40px;border-radius:12px;border:1.5px solid var(--line);font-size:16px;font-family:inherit;}
+  .enc-search svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);opacity:0.4;}
+  .enc-results{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+  .enc-result{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:10px;cursor:pointer;background:var(--paper);}
+  .enc-result:hover{background:var(--primary-soft);}
+  .enc-result .n{font-weight:600;font-size:13.5px;}
+  .enc-result .c{font-size:11px;color:var(--ink-soft);}
+  .receipt{background:var(--paper);border:1.5px solid var(--primary);border-radius:14px;padding:18px;margin-bottom:16px;}
+  .receipt-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+  .receipt-head .n{font-family:'Fraunces',serif;font-size:18px;color:var(--primary-dark);}
+  .receipt-head .c{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .receipt-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;}
+  .receipt-grid .l{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-soft);margin-bottom:3px;}
+  .receipt-grid .v{font-size:16px;}
+  .receipt-input{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+  .receipt-input .fld{flex:1;min-width:160px;}
+  .receipt-input label{font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px;}
+  .receipt-input input{width:100%;padding:11px 12px;border-radius:9px;border:1.5px solid var(--line);font-size:16px;font-family:'IBM Plex Mono',monospace;}
+  .session-log{margin-top:20px;}
+  .session-log h4{font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-soft);margin:0 0 8px;}
+  .log-item{display:flex;justify-content:space-between;font-size:12.5px;padding:7px 0;border-bottom:1px solid var(--line);}
+  .log-item .t{color:var(--ink-soft);font-size:11px;}
+
+  /* Bus */
+  .bus-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+  .bus-card{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--paper);}
+  .bus-card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .bus-card-head .n{font-family:'Fraunces',serif;font-size:15px;color:var(--primary-dark);}
+  .bus-card-head .cap{font-size:11.5px;color:var(--ink-soft);}
+  .occ-bar{height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin:8px 0 10px;}
+  .occ-fill{height:100%;background:var(--primary);}
+  .occ-fill.over{background:var(--danger);}
+  .voy-list{display:flex;flex-direction:column;gap:5px;max-height:180px;overflow-y:auto;}
+  .voy-item{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;padding:5px 0;border-bottom:1px solid var(--line);}
+  .voy-item .tag{font-size:9.5px;padding:2px 6px;border-radius:99px;background:var(--primary-soft);color:var(--primary-dark);font-weight:700;}
+  .voy-item .tag.nonmember{background:var(--accent-soft);color:#7A5518;}
+
+  @media (max-width:640px){
+    .mrow{grid-template-columns:1fr 1fr;}
+    .mrow.cot{grid-template-areas:"name name" "attendu verse" "reste badge";}
+    .mrow .idx{display:none;}
+    .mrow.cot .name{grid-area:name;}
+    .mrow.cot .field.f-attendu{grid-area:attendu;}
+    .mrow.cot .field.f-verse{grid-area:verse;}
+    .mrow.cot .field.f-reste{grid-area:reste;}
+    .mrow.cot .badge{grid-area:badge;justify-self:start;}
+    .badge{justify-self:start;}
+    .obs{padding-left:0;}
+    .masthead{flex-direction:column;}
+    .receipt-grid{grid-template-columns:1fr 1fr;}
+  }
+
+  #printArea{display:none;}
+  .print-table{width:100%;border-collapse:collapse;margin-bottom:14px;}
+  .print-table th,.print-table td{border:1px solid #999;padding:6px 8px;font-size:12px;text-align:left;}
+  .print-table th{background:#eee;}
+  .print-header h1{font-family:Georgia,serif;font-size:20px;margin:0 0 4px;}
+  .print-header .meta{font-size:12px;color:#555;margin-bottom:4px;}
+  @media print{
+    body *{visibility:hidden;}
+    #printArea, #printArea *{visibility:visible;}
+    #printArea{display:block;position:absolute;top:0;left:0;width:100%;padding:0 16px;}
+    .print-page{page-break-after:always;}
+    .print-page:last-child{page-break-after:auto;}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="printArea"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const CATEGORIES = [{"key":"1ere Cat 50","label":"1ère catégorie","base":50000},{"key":"2eme Cat 40","label":"2ème catégorie","base":40000},{"key":"3e cat 30","label":"3ème catégorie","base":30000},{"key":"4e Cat 20","label":"4ème catégorie","base":20000},{"key":"5e Cat 10","label":"5ème catégorie","base":10000}];
+const SEED_MEMBERS = [{"id":1,"categorie":"1ere Cat 50","base":50000,"prenom":"HAMAT SEYDI","nom":"BARRO","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":2,"categorie":"1ere Cat 50","base":50000,"prenom":"AMADOU OUSMANE","nom":"KEBE","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":3,"categorie":"1ere Cat 50","base":50000,"prenom":"ABDOULAYE DEMBA","nom":"DOUCKE","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":4,"categorie":"1ere Cat 50","base":50000,"prenom":"AMADOU MAMADOU","nom":"CAMARA","montant_attendu":50000,"montant_verse":0,"historique":{"2024":50000},"observation":"","bus":""},{"id":5,"categorie":"1ere Cat 50","base":50000,"prenom":"RACINE MAMADOU","nom":"DEME","montant_attendu":100000,"montant_verse":0,"historique":{"2023":100000,"2024":100000},"observation":"","bus":""},{"id":6,"categorie":"1ere Cat 50","base":50000,"prenom":"BABOYE","nom":"NDIAYE","montant_attendu":50000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":7,"categorie":"1ere Cat 50","base":50000,"prenom":"AMADOU LAMINE","nom":"KEBE","montant_attendu":100000,"montant_verse":0,"historique":{"2023":100000,"2024":100000},"observation":"","bus":""},{"id":8,"categorie":"1ere Cat 50","base":50000,"prenom":"AMADOU TIDIANE HOUDOU","nom":"BARRO","montant_attendu":100000,"montant_verse":0,"historique":{"2023":100000,"2024":100000},"observation":"","bus":""},{"id":9,"categorie":"1ere Cat 50","base":50000,"prenom":"ABOU ABDOULAYE YAYA","nom":"DEME","montant_attendu":100000,"montant_verse":0,"historique":{"2023":100000,"2024":100000},"observation":"","bus":""},{"id":10,"categorie":"1ere Cat 50","base":50000,"prenom":"AMADOU ALADJI","nom":"KEBE","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":11,"categorie":"1ere Cat 50","base":50000,"prenom":"HADY HAMET","nom":"BARRO","montant_attendu":100000,"montant_verse":0,"historique":{"2023":100000,"2024":100000},"observation":"","bus":""},{"id":12,"categorie":"1ere Cat 50","base":50000,"prenom":"ABDOU DJIBY","nom":"CAMARA","montant_attendu":100000,"montant_verse":0,"historique":{"2023":100000,"2024":100000},"observation":"","bus":""},{"id":13,"categorie":"1ere Cat 50","base":50000,"prenom":"ABOU MAMADOU AMADOU","nom":"KEBE","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":14,"categorie":"1ere Cat 50","base":50000,"prenom":"AMADOU MALAL","nom":"KEBE","montant_attendu":50000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":15,"categorie":"1ere Cat 50","base":50000,"prenom":"YOUNOUSS KALIDOU","nom":"DIALLO","montant_attendu":50000,"montant_verse":0,"historique":{"2023":100000,"2024":100000},"observation":"","bus":""},{"id":16,"categorie":"1ere Cat 50","base":50000,"prenom":"Chérif Aliou","nom":"BARRO","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":17,"categorie":"1ere Cat 50","base":50000,"prenom":"MOUNTAGA ALPHA","nom":"DEME","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":18,"categorie":"1ere Cat 50","base":50000,"prenom":"MAMADOU SALIF","nom":"TALL","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000},"observation":"","bus":""},{"id":19,"categorie":"1ere Cat 50","base":50000,"prenom":"RASSIDOU ALASSANE D","nom":"DEME","montant_attendu":50000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":20,"categorie":"1ere Cat 50","base":50000,"prenom":"THIERNO HAMDOU","nom":"DEME","montant_attendu":100000,"montant_verse":0,"historique":{"2023":150000,"2024":100000},"observation":"","bus":""},{"id":21,"categorie":"1ere Cat 50","base":50000,"prenom":"Moussa Yaya","nom":"TALL","montant_attendu":100000,"montant_verse":0,"historique":{"2023":100000,"2024":100000},"observation":"","bus":""},{"id":22,"categorie":"1ere Cat 50","base":50000,"prenom":"RASSIDOU ABDOULAYE","nom":"DEME","montant_attendu":100000,"montant_verse":0,"historique":{"2023":100000,"2024":100000},"observation":"","bus":""},{"id":23,"categorie":"1ere Cat 50","base":50000,"prenom":"ABDOUL AZIZ","nom":"TALL","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000},"observation":"","bus":""},{"id":24,"categorie":"1ere Cat 50","base":50000,"prenom":"ABDOU DIOUF","nom":"DIALLO","montant_attendu":100000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":25,"categorie":"1ere Cat 50","base":50000,"prenom":"BAIDY","nom":"GASSAMA","montant_attendu":50000,"montant_verse":0,"historique":{"2024":50000},"observation":"","bus":""},{"id":26,"categorie":"1ere Cat 50","base":50000,"prenom":"OUMAR MALAL","nom":"KEBE","montant_attendu":50000,"montant_verse":0,"historique":{"2023":30000,"2024":50000},"observation":"","bus":""},{"id":27,"categorie":"1ere Cat 50","base":50000,"prenom":"MAMADOU SAMBA THILOUKI","nom":"DEME","montant_attendu":50000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":28,"categorie":"1ere Cat 50","base":50000,"prenom":"THIERNO ABOU SAMBA MELLO","nom":"HANNE","montant_attendu":50000,"montant_verse":0,"historique":{"2024":50000},"observation":"","bus":""},{"id":29,"categorie":"1ere Cat 50","base":50000,"prenom":"MOUNTAGA ABDOULAYE","nom":"DEME","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":100000},"observation":"","bus":""},{"id":30,"categorie":"1ere Cat 50","base":50000,"prenom":"THIERNO HAMDOU BARRO","nom":"BARRO","montant_attendu":50000,"montant_verse":0,"historique":{"2023":100000,"2024":100000},"observation":"","bus":""},{"id":31,"categorie":"1ere Cat 50","base":50000,"prenom":"THIERNO AMADOU MAMADOU","nom":"KEBE","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":32,"categorie":"1ere Cat 50","base":50000,"prenom":"MAMOUDOU TIDIANE CIRE","nom":"BARRO","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":33,"categorie":"1ere Cat 50","base":50000,"prenom":"ADAMA","nom":"BARRO","montant_attendu":100000,"montant_verse":0,"historique":{"2023":100000,"2024":100000},"observation":"","bus":""},{"id":34,"categorie":"1ere Cat 50","base":50000,"prenom":"ADAMA THIERNO HAMET","nom":"BARRO","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":35,"categorie":"1ere Cat 50","base":50000,"prenom":"AMADOU SAMBA ALPHA","nom":"DEME","montant_attendu":100000,"montant_verse":0,"historique":{"2023":100000,"2024":50000},"observation":"","bus":""},{"id":36,"categorie":"1ere Cat 50","base":50000,"prenom":"BASSIROU","nom":"DIALLO","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000},"observation":"","bus":""},{"id":37,"categorie":"1ere Cat 50","base":50000,"prenom":"THIERNO HAMET","nom":"DIALLO","montant_attendu":50000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":38,"categorie":"1ere Cat 50","base":50000,"prenom":"MAMADOU BAIDY","nom":"DIALLO","montant_attendu":50000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":39,"categorie":"1ere Cat 50","base":50000,"prenom":"AMADOU MAMADOU  MOUSSA","nom":"DOUCKE","montant_attendu":50000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":40,"categorie":"1ere Cat 50","base":50000,"prenom":"OUMAR MAMADOU YAYA","nom":"DEME","montant_attendu":50000,"montant_verse":0,"historique":{"2024":50000},"observation":"","bus":""},{"id":41,"categorie":"1ere Cat 50","base":50000,"prenom":"AMADOU DEMEBA","nom":"GASSAMA","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":42,"categorie":"1ere Cat 50","base":50000,"prenom":"MOUSSA MAMADOU","nom":"BA","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000},"observation":"","bus":""},{"id":43,"categorie":"1ere Cat 50","base":50000,"prenom":"CHEIKH OUMAR HAMET","nom":"BARRO","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":44,"categorie":"1ere Cat 50","base":50000,"prenom":"HAMDOU AMADOU ALASSANE","nom":"BARRO","montant_attendu":100000,"montant_verse":0,"historique":{"2023":100000,"2024":100000},"observation":"","bus":""},{"id":45,"categorie":"1ere Cat 50","base":50000,"prenom":"MAMADOU LAMINE","nom":"DEME","montant_attendu":50000,"montant_verse":0,"historique":{"2024":50000},"observation":"","bus":""},{"id":46,"categorie":"1ere Cat 50","base":50000,"prenom":"MAMA AMADOU DIACKEL","nom":"","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":47,"categorie":"1ere Cat 50","base":50000,"prenom":"Mamadou Tidiane CIRE","nom":"BARRO","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":48,"categorie":"1ere Cat 50","base":50000,"prenom":"OUSMANE ABDOULAYE","nom":"DEME","montant_attendu":100000,"montant_verse":0,"historique":{"2023":100000,"2024":100000},"observation":"","bus":""},{"id":49,"categorie":"1ere Cat 50","base":50000,"prenom":"AMADOU SALIF","nom":"TALL","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":50,"categorie":"1ere Cat 50","base":50000,"prenom":"OUMAR MAMADOU","nom":"KEBE","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":51,"categorie":"1ere Cat 50","base":50000,"prenom":"HASSY","nom":"DEME","montant_attendu":50000,"montant_verse":0,"historique":{"2023":50000,"2024":50000},"observation":"","bus":""},{"id":52,"categorie":"1ere Cat 50","base":50000,"prenom":"BABA YAYA ALASSANE RASSIDOU","nom":"DEME","montant_attendu":100000,"montant_verse":0,"historique":{"2023":100000,"2024":50000},"observation":"","bus":""},{"id":53,"categorie":"1ere Cat 50","base":50000,"prenom":"ALIOU MAMADOU YAYA","nom":"DEME","montant_attendu":50000,"montant_verse":0,"historique":{"2024":50000},"observation":"","bus":""},{"id":54,"categorie":"1ere Cat 50","base":50000,"prenom":"AMADOU","nom":"BARRO","montant_attendu":50000,"montant_verse":0,"historique":{"2024":50000},"observation":"","bus":""},{"id":55,"categorie":"1ere Cat 50","base":50000,"prenom":"AMADOU TIDIANE ABDOULAYE","nom":"DEME","montant_attendu":50000,"montant_verse":0,"historique":{"2023":30000,"2024":30000},"observation":"","bus":""},{"id":56,"categorie":"1ere Cat 50","base":50000,"prenom":"Ousmane Hadji Yaya","nom":"DEME","montant_attendu":50000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":57,"categorie":"1ere Cat 50","base":50000,"prenom":"MOUSSA OUMAR BARKA","nom":"BARO","montant_attendu":50000,"montant_verse":0,"historique":{"2023":20000,"2024":40000},"observation":"","bus":""},{"id":58,"categorie":"1ere Cat 50","base":50000,"prenom":"ALIOU MAMADOU","nom":"KEBE","montant_attendu":50000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":59,"categorie":"1ere Cat 50","base":50000,"prenom":"AMADOU HAMET","nom":"DIALLO","montant_attendu":50000,"montant_verse":0,"historique":{"2023":40000,"2024":40000},"observation":"","bus":""},{"id":60,"categorie":"1ere Cat 50","base":50000,"prenom":"OUSMANE MAMADOU","nom":"KEBE","montant_attendu":50000,"montant_verse":0,"historique":{"2023":40000,"2024":40000},"observation":"","bus":""},{"id":61,"categorie":"1ere Cat 50","base":50000,"prenom":"ABOU KELLY","nom":"KEBE","montant_attendu":50000,"montant_verse":0,"historique":{"2024":40000},"observation":"","bus":""},{"id":62,"categorie":"1ere Cat 50","base":50000,"prenom":"DAOUDA DAWOWO","nom":"BARRO","montant_attendu":50000,"montant_verse":0,"historique":{"2023":30000,"2024":30000},"observation":"","bus":""},{"id":63,"categorie":"1ere Cat 50","base":50000,"prenom":"ABOU MIKA","nom":"KEBE","montant_attendu":50000,"montant_verse":0,"historique":{"2024":30000},"observation":"","bus":""},{"id":64,"categorie":"1ere Cat 50","base":50000,"prenom":"EL HADJI","nom":"PENE","montant_attendu":50000,"montant_verse":0,"historique":{"2023":30000,"2024":30000},"observation":"","bus":""},{"id":65,"categorie":"1ere Cat 50","base":50000,"prenom":"MAMADOU ABDOULAYE DIAM","nom":"KEBE","montant_attendu":50000,"montant_verse":0,"historique":{"2023":30000,"2024":30000},"observation":"","bus":""},{"id":66,"categorie":"1ere Cat 50","base":50000,"prenom":"ABDOURAHMANE OUSMANE","nom":"DEME","montant_attendu":50000,"montant_verse":0,"historique":{"2024":30000},"observation":"","bus":""},{"id":67,"categorie":"1ere Cat 50","base":50000,"prenom":"AMADOU ALASSANE","nom":"THIONGANE","montant_attendu":50000,"montant_verse":0,"historique":{"2024":30000},"observation":"","bus":""},{"id":68,"categorie":"1ere Cat 50","base":50000,"prenom":"Cheikh Oumar Houdou","nom":"BARRO","montant_attendu":50000,"montant_verse":0,"historique":{"2023":20000,"2024":30000},"observation":"","bus":""},{"id":69,"categorie":"1ere Cat 50","base":50000,"prenom":"Amadou mamadou BA (medecin)","nom":"","montant_attendu":50000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":70,"categorie":"1ere Cat 50","base":50000,"prenom":"Hamet","nom":"DIA","montant_attendu":50000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":71,"categorie":"1ere Cat 50","base":50000,"prenom":"AMADOU TIDIANE MAMADOU DICKEL","nom":"DOUCKE","montant_attendu":50000,"montant_verse":0,"historique":{"2024":30000},"observation":"","bus":""},{"id":72,"categorie":"3e cat 30","base":30000,"prenom":"MALICK MAMADOU PENDA","nom":"BARRO","montant_attendu":30000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":73,"categorie":"3e cat 30","base":30000,"prenom":"OUMAR ABDOULAYE","nom":"DOUKE","montant_attendu":30000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":74,"categorie":"3e cat 30","base":30000,"prenom":"ABDOULAYE DEMBA","nom":"ANNE","montant_attendu":30000,"montant_verse":0,"historique":{"2023":30000,"2025":30000},"observation":"","bus":""},{"id":75,"categorie":"3e cat 30","base":30000,"prenom":"ALIOU ABDOULAYE","nom":"DOUCKE","montant_attendu":30000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":76,"categorie":"3e cat 30","base":30000,"prenom":"ALIOU NDIAYE BOUDY","nom":"KEBE","montant_attendu":30000,"montant_verse":0,"historique":{"2023":30000,"2025":30000},"observation":"","bus":""},{"id":77,"categorie":"3e cat 30","base":30000,"prenom":"OUMAR KHARDIATOU","nom":"BARRO","montant_attendu":30000,"montant_verse":0,"historique":{"2023":30000,"2025":30000},"observation":"","bus":""},{"id":78,"categorie":"3e cat 30","base":30000,"prenom":"HAROUNA","nom":"THIONGANE","montant_attendu":30000,"montant_verse":0,"historique":{"2023":30000,"2025":30000},"observation":"","bus":""},{"id":79,"categorie":"3e cat 30","base":30000,"prenom":"AMADOU ABOU","nom":"LY","montant_attendu":30000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":80,"categorie":"3e cat 30","base":30000,"prenom":"OUMAR DEMBA ASTEL","nom":"BA","montant_attendu":30000,"montant_verse":0,"historique":{"2023":30000,"2025":30000},"observation":"","bus":""},{"id":81,"categorie":"3e cat 30","base":30000,"prenom":"YAYA","nom":"THIONGANE","montant_attendu":30000,"montant_verse":0,"historique":{"2023":30000,"2025":30000},"observation":"","bus":""},{"id":82,"categorie":"3e cat 30","base":30000,"prenom":"ALIOU AMADOU DJABALLI","nom":"BARRO","montant_attendu":30000,"montant_verse":0,"historique":{"2025":30000},"observation":"","bus":""},{"id":83,"categorie":"3e cat 30","base":30000,"prenom":"SEYDOU ABDOULAYE","nom":"DEME","montant_attendu":30000,"montant_verse":0,"historique":{"2025":30000},"observation":"","bus":""},{"id":84,"categorie":"3e cat 30","base":30000,"prenom":"MAMADOU MOUCTAR","nom":"DOUCKE","montant_attendu":30000,"montant_verse":0,"historique":{"2025":30000},"observation":"","bus":""},{"id":85,"categorie":"3e cat 30","base":30000,"prenom":"ABOU OUSMANE","nom":"TALL","montant_attendu":30000,"montant_verse":0,"historique":{"2023":40000},"observation":"","bus":""},{"id":86,"categorie":"3e cat 30","base":30000,"prenom":"ALASSANE SAMBA","nom":"DIA","montant_attendu":30000,"montant_verse":0,"historique":{"2023":25000},"observation":"","bus":""},{"id":87,"categorie":"3e cat 30","base":30000,"prenom":"CHEIKH OUMAR","nom":"BARRO","montant_attendu":30000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":88,"categorie":"3e cat 30","base":30000,"prenom":"BAABA OUMAR BARKA","nom":"BARRO","montant_attendu":30000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":89,"categorie":"3e cat 30","base":30000,"prenom":"OUSMANE HAMIDOU SAMBA AWA","nom":"BARRO","montant_attendu":30000,"montant_verse":0,"historique":{"2023":30000},"observation":"","bus":""},{"id":90,"categorie":"3e cat 30","base":30000,"prenom":"CHERIF OUMAR BARRO","nom":"BARRO","montant_attendu":30000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":91,"categorie":"3e cat 30","base":30000,"prenom":"CHEIKH HAMIDOU","nom":"BARRO","montant_attendu":30000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":92,"categorie":"3e cat 30","base":30000,"prenom":"OUMAR MOUSTAPHA","nom":"BARRO","montant_attendu":30000,"montant_verse":0,"historique":{"2023":20000},"observation":"","bus":""},{"id":93,"categorie":"3e cat 30","base":30000,"prenom":"SADA TIDIANE CIRE","nom":"BARRO","montant_attendu":30000,"montant_verse":0,"historique":{"2023":20000},"observation":"","bus":""},{"id":94,"categorie":"3e cat 30","base":30000,"prenom":"OUSMANE SAMBA DIOUBOUR","nom":"","montant_attendu":30000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":95,"categorie":"3e cat 30","base":30000,"prenom":"ABDOULAYE MAMADOU DICKEL","nom":"","montant_attendu":30000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":96,"categorie":"3e cat 30","base":30000,"prenom":"OUSMANE SAMBA ALPHA","nom":"DEME","montant_attendu":30000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":97,"categorie":"3e cat 30","base":30000,"prenom":"Cherif OUMAR SAMBA","nom":"BARRO","montant_attendu":30000,"montant_verse":0,"historique":{"2025":25000},"observation":"kaolack","bus":""},{"id":98,"categorie":"3e cat 30","base":30000,"prenom":"ALIOU TIDIANE CIRE","nom":"BARRO","montant_attendu":30000,"montant_verse":0,"historique":{"2023":50000},"observation":"","bus":""},{"id":99,"categorie":"3e cat 30","base":30000,"prenom":"ABDOULAYE AMADOU DIABALDI","nom":"","montant_attendu":30000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":100,"categorie":"4e Cat 20","base":20000,"prenom":"OUMAR WELE","nom":"KEBE","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":101,"categorie":"4e Cat 20","base":20000,"prenom":"THIERNO RELLA","nom":"KEBE","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":102,"categorie":"4e Cat 20","base":20000,"prenom":"IBRAHIMA DAWOW","nom":"BARRO","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":103,"categorie":"4e Cat 20","base":20000,"prenom":"Mamadou Hamet","nom":"DIALLO","montant_attendu":20000,"montant_verse":0,"historique":{},"observation":"Tamba","bus":""},{"id":104,"categorie":"4e Cat 20","base":20000,"prenom":"OUMAR IBRAHIMA","nom":"KEBE","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":105,"categorie":"4e Cat 20","base":20000,"prenom":"MAMADOU SEYDI( BABA DIALELE)","nom":"DIALLO","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":106,"categorie":"4e Cat 20","base":20000,"prenom":"ABDOULAYE","nom":"TALL","montant_attendu":20000,"montant_verse":0,"historique":{"2024":20000},"observation":"DIACKA","bus":""},{"id":107,"categorie":"4e Cat 20","base":20000,"prenom":"MAMADOU ADAMA","nom":"KEBE","montant_attendu":20000,"montant_verse":0,"historique":{"2024":20000},"observation":"","bus":""},{"id":108,"categorie":"4e Cat 20","base":20000,"prenom":"OUSMANE","nom":"NDIAYE","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":109,"categorie":"4e Cat 20","base":20000,"prenom":"PAPA","nom":"ATH","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":110,"categorie":"4e Cat 20","base":20000,"prenom":"ABDOUL","nom":"TALL","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"touba","bus":""},{"id":111,"categorie":"4e Cat 20","base":20000,"prenom":"MAMOUDOU","nom":"MBODJI","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":112,"categorie":"4e Cat 20","base":20000,"prenom":"THIERNO","nom":"MBODJI","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":113,"categorie":"4e Cat 20","base":20000,"prenom":"ALIOU OUMAR DIBOLI","nom":"BARRO","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":114,"categorie":"4e Cat 20","base":20000,"prenom":"MOUSSA BABA","nom":"BA","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":115,"categorie":"4e Cat 20","base":20000,"prenom":"MOUTAR OUSMANE","nom":"BARRO","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":116,"categorie":"4e Cat 20","base":20000,"prenom":"BABA YAYA","nom":"KEBE","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":117,"categorie":"4e Cat 20","base":20000,"prenom":"MAMADOU SAMBA SALA","nom":"KEBE","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":118,"categorie":"4e Cat 20","base":20000,"prenom":"BOUBACAR MOUSTAPHA","nom":"BARRO","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":119,"categorie":"4e Cat 20","base":20000,"prenom":"IBRAHIMA DEMBA","nom":"GASSAMA","montant_attendu":20000,"montant_verse":0,"historique":{"2024":20000},"observation":"","bus":""},{"id":120,"categorie":"4e Cat 20","base":20000,"prenom":"SEYDOU HAMETH TALLO","nom":"DIALLO","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":121,"categorie":"4e Cat 20","base":20000,"prenom":"MAMADOU OUSMANE","nom":"THIAM","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"THIAMELE","bus":""},{"id":122,"categorie":"4e Cat 20","base":20000,"prenom":"ALASSANE SAMBA","nom":"BARRO","montant_attendu":20000,"montant_verse":0,"historique":{"2024":20000},"observation":"ST Louis","bus":""},{"id":123,"categorie":"4e Cat 20","base":20000,"prenom":"ADAMA ABDOULAYE MAMADOU","nom":"KEBE","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":124,"categorie":"4e Cat 20","base":20000,"prenom":"ALASSANE ABDOUL DICKEL","nom":"BARRO","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":125,"categorie":"4e Cat 20","base":20000,"prenom":"OUSMANE MAMADOU","nom":"BA","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":126,"categorie":"4e Cat 20","base":20000,"prenom":"AMADOU TIDIANE MAMADOU YAYA","nom":"DEME","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":127,"categorie":"4e Cat 20","base":20000,"prenom":"SEYDI","nom":"THIAM","montant_attendu":20000,"montant_verse":0,"historique":{"2024":20000},"observation":"","bus":""},{"id":128,"categorie":"4e Cat 20","base":20000,"prenom":"DRAME","nom":"BARRO","montant_attendu":20000,"montant_verse":0,"historique":{"2024":20000},"observation":"","bus":""},{"id":129,"categorie":"4e Cat 20","base":20000,"prenom":"MOUTAR","nom":"GASSAMA","montant_attendu":20000,"montant_verse":0,"historique":{"2024":20000},"observation":"","bus":""},{"id":130,"categorie":"4e Cat 20","base":20000,"prenom":"CHEIKH OUMAR MAMADOU YERO","nom":"KEBE","montant_attendu":20000,"montant_verse":0,"historique":{"2024":20000},"observation":"","bus":""},{"id":131,"categorie":"4e Cat 20","base":20000,"prenom":"AMADOU HAMET","nom":"BARRO","montant_attendu":20000,"montant_verse":0,"historique":{"2023":15000,"2024":20000},"observation":"","bus":""},{"id":132,"categorie":"4e Cat 20","base":20000,"prenom":"ALPHA","nom":"TALL","montant_attendu":20000,"montant_verse":0,"historique":{"2023":40000,"2024":20000},"observation":"","bus":""},{"id":133,"categorie":"4e Cat 20","base":20000,"prenom":"MOUSSA AMADOU  THILELE","nom":"BARRO","montant_attendu":20000,"montant_verse":0,"historique":{"2023":30000,"2024":20000},"observation":"","bus":""},{"id":134,"categorie":"4e Cat 20","base":20000,"prenom":"IBRAHIMA MOUSSA","nom":"KEBE","montant_attendu":20000,"montant_verse":0,"historique":{"2024":20000},"observation":"","bus":""},{"id":135,"categorie":"4e Cat 20","base":20000,"prenom":"OUSMANE MAMADOU SILEYE","nom":"BARRO","montant_attendu":20000,"montant_verse":0,"historique":{"2024":20000},"observation":"","bus":""},{"id":136,"categorie":"4e Cat 20","base":20000,"prenom":"HAMATH AMADOU THILELE","nom":"BARRO","montant_attendu":20000,"montant_verse":0,"historique":{"2024":20000},"observation":"","bus":""},{"id":137,"categorie":"4e Cat 20","base":20000,"prenom":"AMADOU OUSMANE AMADOU","nom":"KEBE","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000},"observation":"","bus":""},{"id":138,"categorie":"4e Cat 20","base":20000,"prenom":"ALPHA SAMBA ALPHA","nom":"DEME","montant_attendu":20000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":139,"categorie":"4e Cat 20","base":20000,"prenom":"BILALI","nom":"BARRO","montant_attendu":20000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":140,"categorie":"4e Cat 20","base":20000,"prenom":"SEYDOU DAWOWO","nom":"BARRO","montant_attendu":20000,"montant_verse":0,"historique":{"2023":20000,"2024":30000},"observation":"","bus":""},{"id":141,"categorie":"4e Cat 20","base":20000,"prenom":"ABDOULAYE ABOU","nom":"KEBE","montant_attendu":20000,"montant_verse":0,"historique":{},"observation":"Papii","bus":""},{"id":142,"categorie":"4e Cat 20","base":20000,"prenom":"Thierno Tokossel","nom":"BARRO","montant_attendu":20000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":143,"categorie":"4e Cat 20","base":20000,"prenom":"RASSIDOU SAMBA THILOUKI","nom":"DEME","montant_attendu":20000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":144,"categorie":"4e Cat 20","base":20000,"prenom":"SADIO","nom":"THIONGANE","montant_attendu":20000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":145,"categorie":"4e Cat 20","base":20000,"prenom":"CHEIKH","nom":"BA","montant_attendu":20000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":146,"categorie":"5e Cat 10","base":10000,"prenom":"ALASSANE IBRAHIMA","nom":"KEBE","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":147,"categorie":"5e Cat 10","base":10000,"prenom":"ADAMA BELLE","nom":"TALL","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"mbour","bus":""},{"id":148,"categorie":"5e Cat 10","base":10000,"prenom":"IBRAHIMA OUSMANE","nom":"TALL","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":149,"categorie":"5e Cat 10","base":10000,"prenom":"MAMADOU SADA","nom":"TALL","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"mbour","bus":""},{"id":150,"categorie":"5e Cat 10","base":10000,"prenom":"ABDOULAYE","nom":"THIAM","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":151,"categorie":"5e Cat 10","base":10000,"prenom":"SAIDOU BAYAL","nom":"TALL","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":152,"categorie":"5e Cat 10","base":10000,"prenom":"MAMA BABOYE","nom":"KEBE","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":153,"categorie":"5e Cat 10","base":10000,"prenom":"MAMADOU","nom":"DIA","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":154,"categorie":"5e Cat 10","base":10000,"prenom":"CHEIKHNA OUSMANE","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":155,"categorie":"5e Cat 10","base":10000,"prenom":"AMADOU IBRAHIMA","nom":"MAI","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":156,"categorie":"5e Cat 10","base":10000,"prenom":"MOUTAR DEMBA BILO","nom":"KEBE","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":157,"categorie":"5e Cat 10","base":10000,"prenom":"THIERNO AMADOU NENE","nom":"KEBE","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":158,"categorie":"5e Cat 10","base":10000,"prenom":"MAMADOU ABDOULAYE DEMBA","nom":"DOUCKE","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":159,"categorie":"5e Cat 10","base":10000,"prenom":"AMADOU NGADJELLE","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":160,"categorie":"5e Cat 10","base":10000,"prenom":"IBRAHIMA MOUSTAPHA","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":161,"categorie":"5e Cat 10","base":10000,"prenom":"IBRAHIMA BABOYE","nom":"KEBE","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":162,"categorie":"5e Cat 10","base":10000,"prenom":"ADAMA BOUBOU","nom":"DIALLO","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":163,"categorie":"5e Cat 10","base":10000,"prenom":"MAMOUDOU NGNILEE","nom":"BA","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":164,"categorie":"5e Cat 10","base":10000,"prenom":"SANOUME MAMA","nom":"TALLA","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":165,"categorie":"5e Cat 10","base":10000,"prenom":"MAMADOU AMADOU ABOU","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"fouta","bus":""},{"id":166,"categorie":"5e Cat 10","base":10000,"prenom":"MAM DIEYNA","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"fouta","bus":""},{"id":167,"categorie":"5e Cat 10","base":10000,"prenom":"SEYDOU","nom":"LY","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"fouta","bus":""},{"id":168,"categorie":"5e Cat 10","base":10000,"prenom":"ABOU MOUSSA DJAMILATOU","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"fouta","bus":""},{"id":169,"categorie":"5e Cat 10","base":10000,"prenom":"BABA YAYA TANA","nom":"DEME","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":170,"categorie":"5e Cat 10","base":10000,"prenom":"MAMOUDOU DEMBA","nom":"ANNE","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":171,"categorie":"5e Cat 10","base":10000,"prenom":"AMADOU MAMADOU ABDY","nom":"SY","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":172,"categorie":"5e Cat 10","base":10000,"prenom":"ABDOULAYE HAMET","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":173,"categorie":"5e Cat 10","base":10000,"prenom":"MOUTAR SILEYE","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":174,"categorie":"5e Cat 10","base":10000,"prenom":"BABA YAYA OUSMANE","nom":"KEBE","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"fouta","bus":""},{"id":175,"categorie":"5e Cat 10","base":10000,"prenom":"MOUSSA ABDOULAYE","nom":"KEBE","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"DOULA","bus":""},{"id":176,"categorie":"5e Cat 10","base":10000,"prenom":"IBRAHIMA SANOUME","nom":"KEBE","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":177,"categorie":"5e Cat 10","base":10000,"prenom":"TANOYE SANOUME","nom":"KEBE","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":178,"categorie":"5e Cat 10","base":10000,"prenom":"ADAMA NDIAYE","nom":"KEBE","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":179,"categorie":"5e Cat 10","base":10000,"prenom":"ABDOULAYE DOULA PENE","nom":"PENE","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":180,"categorie":"5e Cat 10","base":10000,"prenom":"HAMATH OULEYE","nom":"KEBE","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"Thies","bus":""},{"id":181,"categorie":"5e Cat 10","base":10000,"prenom":"ALADJI ALPHA DICKEL","nom":"DEME","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":182,"categorie":"5e Cat 10","base":10000,"prenom":"MOUSSA OUMAR DIBOLY","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":183,"categorie":"5e Cat 10","base":10000,"prenom":"SOULEYMANE GAYO","nom":"TALL","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":184,"categorie":"5e Cat 10","base":10000,"prenom":"AMADOU BAYAL","nom":"TALL","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":185,"categorie":"5e Cat 10","base":10000,"prenom":"ABDOULAYE GADJELE","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":186,"categorie":"5e Cat 10","base":10000,"prenom":"ALIOU BADARA (ibn Adama)","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":187,"categorie":"5e Cat 10","base":10000,"prenom":"Mama Amadou Ousmane","nom":"KEBE","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":188,"categorie":"5e Cat 10","base":10000,"prenom":"SEYDI HAMET","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":189,"categorie":"5e Cat 10","base":10000,"prenom":"Mamadou Mody","nom":"DIA","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"St Louis","bus":""},{"id":190,"categorie":"5e Cat 10","base":10000,"prenom":"Abou","nom":"THIONGANE","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"Fouta","bus":""},{"id":191,"categorie":"5e Cat 10","base":10000,"prenom":"Mama","nom":"SY","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"Fouta","bus":""},{"id":192,"categorie":"5e Cat 10","base":10000,"prenom":"Dahirou","nom":"PENE","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"Fouta ASP","bus":""},{"id":193,"categorie":"5e Cat 10","base":10000,"prenom":"Moussa Ablaye Yaya","nom":"DEME","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"Fouta","bus":""},{"id":194,"categorie":"5e Cat 10","base":10000,"prenom":"Mama Moro","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":195,"categorie":"5e Cat 10","base":10000,"prenom":"Aliou Samba Rabi","nom":"PENE","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":196,"categorie":"5e Cat 10","base":10000,"prenom":"OUSSOU DIEYNA","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":197,"categorie":"5e Cat 10","base":10000,"prenom":"ABOU DIEYNA","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":198,"categorie":"5e Cat 10","base":10000,"prenom":"MAMADOU OUMAR SOKHNA","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":199,"categorie":"5e Cat 10","base":10000,"prenom":"OUMAR AMADOU DIACKEL","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{"2023":10000,"2024":10000},"observation":"","bus":""},{"id":200,"categorie":"5e Cat 10","base":10000,"prenom":"ABOU MOUSSA DIAMILATOU","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"FOUTA","bus":""},{"id":201,"categorie":"5e Cat 10","base":10000,"prenom":"MAMADOU BABA","nom":"BA","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":202,"categorie":"5e Cat 10","base":10000,"prenom":"MAMADOU IBRAHIMA MALAL","nom":"DOUCKE","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":203,"categorie":"5e Cat 10","base":10000,"prenom":"OUSMANE HAMET","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":204,"categorie":"5e Cat 10","base":10000,"prenom":"OUMAR SAMBA CODA","nom":"NDIAYE","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":205,"categorie":"5e Cat 10","base":10000,"prenom":"AMADOU SAMBA CODA","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":206,"categorie":"5e Cat 10","base":10000,"prenom":"ABDOULAYE ABOU PATHE","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":207,"categorie":"5e Cat 10","base":10000,"prenom":"BABA SEYDI WOULOUM","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":208,"categorie":"5e Cat 10","base":10000,"prenom":"OUMAR WOULOUM","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":209,"categorie":"5e Cat 10","base":10000,"prenom":"AMADOU THIERNO","nom":"SY","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":210,"categorie":"5e Cat 10","base":10000,"prenom":"TIDIANE MODY BANA","nom":"DIA","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":211,"categorie":"5e Cat 10","base":10000,"prenom":"AMADOU MOUSTAPHA","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":212,"categorie":"5e Cat 10","base":10000,"prenom":"Alassane Adama Doudou","nom":"KEBE","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":213,"categorie":"5e Cat 10","base":10000,"prenom":"MOUNTAGA SAMBA ALPHA","nom":"DEME","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":214,"categorie":"5e Cat 10","base":10000,"prenom":"ADAMA SAMBA ALPHA","nom":"DEME","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":215,"categorie":"5e Cat 10","base":10000,"prenom":"HAMDOU MOUNTAGA ALPHA","nom":"DEME","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":216,"categorie":"5e Cat 10","base":10000,"prenom":"MOUCTAR MAMADOU BOCAR","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":217,"categorie":"5e Cat 10","base":10000,"prenom":"MAMOUDOU MBOLO","nom":"FALL","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":218,"categorie":"5e Cat 10","base":10000,"prenom":"OUSMANE DEMBA BILO","nom":"KEBE","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":219,"categorie":"5e Cat 10","base":10000,"prenom":"OUSMANE SILEYMANE","nom":"PENE","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":220,"categorie":"5e Cat 10","base":10000,"prenom":"DEMBA MALI","nom":"HANN","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":221,"categorie":"5e Cat 10","base":10000,"prenom":"MAMA KHARDIATOU","nom":"DJOLI","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":222,"categorie":"5e Cat 10","base":10000,"prenom":"BAROU KEBEL","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{"2024":10000},"observation":"","bus":""},{"id":223,"categorie":"5e Cat 10","base":10000,"prenom":"Mamadou Mariata Samba Thioulouki","nom":"SY","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":224,"categorie":"5e Cat 10","base":10000,"prenom":"Mamadou Ablaye Tallel","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"Tallel","bus":""},{"id":225,"categorie":"5e Cat 10","base":10000,"prenom":"Adama Kalidou","nom":"DIALLO","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"FOUTA","bus":""},{"id":226,"categorie":"5e Cat 10","base":10000,"prenom":"Sileye Samba Kodda","nom":"NDIAYE","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":227,"categorie":"5e Cat 10","base":10000,"prenom":"DAHA","nom":"WELE","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":228,"categorie":"5e Cat 10","base":10000,"prenom":"CHEIKH","nom":"NDIAYE","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":229,"categorie":"5e Cat 10","base":10000,"prenom":"Alassane","nom":"DIALLO","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":230,"categorie":"5e Cat 10","base":10000,"prenom":"MOUTAR BOCAR","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":231,"categorie":"5e Cat 10","base":10000,"prenom":"MALAL","nom":"KEBE","montant_attendu":10000,"montant_verse":0,"historique":{"2023":20000,"2024":20000},"observation":"","bus":""},{"id":232,"categorie":"5e Cat 10","base":10000,"prenom":"Mamadou Oumar Demba","nom":"DOUCKE","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":233,"categorie":"5e Cat 10","base":10000,"prenom":"Moukhtar Mamadou Abdoul Dickel","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":234,"categorie":"5e Cat 10","base":10000,"prenom":"Boubacar Ibrahima Mai","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":235,"categorie":"5e Cat 10","base":10000,"prenom":"ABOU MALICK","nom":"LY","montant_attendu":10000,"montant_verse":0,"historique":{"2024":20000},"observation":"","bus":""},{"id":236,"categorie":"5e Cat 10","base":10000,"prenom":"IBRAHIMA OUSMANE BARKA","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{"2024":20000},"observation":"","bus":""},{"id":237,"categorie":"5e Cat 10","base":10000,"prenom":"THIERNO MOUNTAGA","nom":"TALL","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":238,"categorie":"5e Cat 10","base":10000,"prenom":"CHEIKH","nom":"GASSAMA","montant_attendu":10000,"montant_verse":0,"historique":{"2024":20000},"observation":"","bus":""},{"id":239,"categorie":"5e Cat 10","base":10000,"prenom":"Baba Amadou","nom":"GASSAMA","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":240,"categorie":"5e Cat 10","base":10000,"prenom":"MAMADOU SAMBA RABY","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":241,"categorie":"5e Cat 10","base":10000,"prenom":"BABA HAWA SILEYE","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":242,"categorie":"5e Cat 10","base":10000,"prenom":"Mouctar Mamadou Abdoul Dickel","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":243,"categorie":"5e Cat 10","base":10000,"prenom":"Abdoul Mouctar Abdoul Dickel","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":244,"categorie":"5e Cat 10","base":10000,"prenom":"ABDOULAYE","nom":"SOW","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":245,"categorie":"5e Cat 10","base":10000,"prenom":"ABDOULAYE OUSMANE BARKA","nom":"BARRO","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":246,"categorie":"5e Cat 10","base":10000,"prenom":"MAMADOU SANOUME","nom":"KEBE","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":247,"categorie":"5e Cat 10","base":10000,"prenom":"MAMOUDOU ABDOULAYE DIAM","nom":"KEBE","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""},{"id":248,"categorie":"5e Cat 10","base":10000,"prenom":"AMADOU ABOU HAWA","nom":"","montant_attendu":10000,"montant_verse":0,"historique":{},"observation":"","bus":""}];
+const SEED_DEPENSES = [{"id":1,"libelle":"Commande de Bœufs","avance":1000000,"justifie":0,"responsable":"","historique":{"2022":800000,"2023":800000,"2024":800000,"2025":800000}},{"id":2,"libelle":"Avance Bus","avance":0,"justifie":0,"responsable":"AMADOU LAMINE KEBE","historique":{"2022":1000000,"2023":2000000,"2024":2000000,"2025":2000000}},{"id":3,"libelle":"RIZ HUILE OIGNONS","avance":0,"justifie":0,"responsable":"AMADOU OUSMANE","historique":{"2022":400000,"2023":500000,"2024":500000,"2025":500000}},{"id":4,"libelle":"LEGUMES","avance":0,"justifie":0,"responsable":"BELELE","historique":{"2022":50000,"2023":75000,"2024":75000,"2025":75000}},{"id":5,"libelle":"ZIAR","avance":0,"justifie":0,"responsable":"AMADOU OUSMANE","historique":{"2022":50000,"2023":100000,"2024":100000,"2025":100000}},{"id":6,"libelle":"LEGAL","avance":0,"justifie":0,"responsable":"ALASSANE THIONGANE","historique":{"2022":50000,"2023":50000,"2024":50000,"2025":50000}},{"id":7,"libelle":"DINER","avance":0,"justifie":0,"responsable":"THIERNO RELLA","historique":{"2025":500000}},{"id":8,"libelle":"TRANSPORTS SONO","avance":0,"justifie":0,"responsable":"","historique":{"2023":5000,"2024":8000}},{"id":9,"libelle":"TRANSPORTS VIEUX","avance":0,"justifie":0,"responsable":"","historique":{"2022":10000,"2023":10000,"2024":16000,"2025":16000}},{"id":10,"libelle":"DECORATION THIALY","avance":0,"justifie":0,"responsable":"HASSI","historique":{"2022":100000,"2023":100000,"2024":100000,"2025":100000}},{"id":11,"libelle":"ELECTRICITE THIALY","avance":0,"justifie":0,"responsable":"HADY BARRO","historique":{"2023":187500,"2024":90000,"2025":80000}},{"id":12,"libelle":"ZIAR OUACETAKE","avance":0,"justifie":0,"responsable":"AMADOU OUSMANE","historique":{"2023":25000,"2024":25000,"2025":25000}},{"id":13,"libelle":"Transport Materiel","avance":0,"justifie":0,"responsable":"","historique":{"2023":2500,"2024":5000,"2025":5000}},{"id":14,"libelle":"Reparation SONO","avance":0,"justifie":0,"responsable":"","historique":{"2024":50000}},{"id":15,"libelle":"Reparation haut parleur","avance":0,"justifie":0,"responsable":"","historique":{"2024":15000,"2025":2000}},{"id":16,"libelle":"CHAISES","avance":0,"justifie":0,"responsable":"","historique":{"2022":2460000,"2024":250000,"2025":300000}},{"id":17,"libelle":"BACHES","avance":0,"justifie":0,"responsable":"RACINE DEME","historique":{"2025":900000}}];
+const SEED_BONNESVOLONTES = [{"id":1,"nom":"Gambie","montant":0,"ziar":0,"observation":""},{"id":2,"nom":"Ousmane Yaya DEME","montant":0,"ziar":0,"observation":""},{"id":3,"nom":"Ibou BARRO","montant":0,"ziar":0,"observation":""},{"id":4,"nom":"Daouda BARRO","montant":0,"ziar":0,"observation":""},{"id":5,"nom":"Hamet BARRO","montant":0,"ziar":0,"observation":""},{"id":6,"nom":"Seynabou BARRO","montant":0,"ziar":0,"observation":""},{"id":7,"nom":"Amy SEYE","montant":0,"ziar":0,"observation":""},{"id":8,"nom":"Ablaye GALO Hann","montant":0,"ziar":0,"observation":""},{"id":9,"nom":"Moussa GALO","montant":0,"ziar":0,"observation":""},{"id":10,"nom":"Congo","montant":0,"ziar":0,"observation":""},{"id":11,"nom":"Féddé le 06","montant":0,"ziar":0,"observation":""},{"id":12,"nom":"Cote d'ivoire","montant":0,"ziar":0,"observation":""},{"id":13,"nom":"Amadou Hamet Mbourré","montant":0,"ziar":0,"observation":""},{"id":14,"nom":"Thierno Moussa DIA","montant":0,"ziar":0,"observation":""},{"id":15,"nom":"Fati mamadou Amadou Kebe","montant":0,"ziar":0,"observation":""},{"id":16,"nom":"Kardiata Amadou SALL","montant":0,"ziar":0,"observation":""},{"id":17,"nom":"Penda BARRO","montant":0,"ziar":0,"observation":""},{"id":18,"nom":"Amnata Thierno Hamet BARRO","montant":0,"ziar":0,"observation":""},{"id":19,"nom":"Rassidou Sarrata","montant":0,"ziar":0,"observation":""},{"id":20,"nom":"Samba SELLY","montant":0,"ziar":0,"observation":""},{"id":21,"nom":"Kardiatou Abdoulaye Yaya DEME","montant":0,"ziar":0,"observation":""},{"id":22,"nom":"Caisse Mouyabé et Ndiabaldii","montant":0,"ziar":0,"observation":""},{"id":23,"nom":"Asmawou Thierno Hemth","montant":0,"ziar":0,"observation":""},{"id":24,"nom":"Cherif GASSAMA","montant":0,"ziar":0,"observation":""},{"id":25,"nom":"Divers","montant":0,"ziar":0,"observation":""}];
+const SEED_DONSNATURE = [{"id":1,"donateur":"AMADOU LAMINE KEBE","article":"NESCAFE"},{"id":2,"donateur":"TIDIANE CIRE","article":"LALO + SEL"},{"id":3,"donateur":"RACINE DEME","article":"THE"},{"id":4,"donateur":"HASSIMIOU ABDOULAYE","article":"MOUTARDE"},{"id":5,"donateur":"ADAMA BARRO","article":"POIVRE"},{"id":6,"donateur":"YOUNOUSS KALIDOU DIALLO","article":"COLA"},{"id":7,"donateur":"ABOU ABDOULAYE","article":"CUBE MAGGI"},{"id":8,"donateur":"MAMADOU ABDOULAYE DIAM KEBE","article":"VINAIGRE"},{"id":9,"donateur":"ALPHA SAMBA ALAPHA","article":"OMO"},{"id":10,"donateur":"OUMAR MAMADOU DEME","article":"AIL"},{"id":11,"donateur":"OUMAR DEMBA ASTEL","article":"BONBON MENTH"}];
+const SEED_MOBILEMONEY = [{"id":1,"nom":"SAMBA DIA","operateur":"WAVE","montant":100000}];
+const SEED_SYNTHESE = {"report_caisse":1663650};
+const SEED_BUSES = [{"id":1,"nom":"Bus 1","capacite":70},{"id":2,"nom":"Bus 2","capacite":70},{"id":3,"nom":"Bus 3","capacite":70},{"id":4,"nom":"Bus 4","capacite":70}];
+const SEED_BUSTRANSPORT = {"destination":"Barobé Diackel","depart":"SEFA Pikine","date_depart":"2026-08-23","note":"Départ prévu 2 jours avant le Maouloud"};
+const MAX_BUSES = 4;
+const MAX_CAPACITE = 70;
+const SEED_VOYAGEURS = [];
+
+const STORAGE_KEYS = {
+  members:'maouloud2026-members', mobilemoney:'maouloud2026-mobilemoney',
+  bonnesvolontes:'maouloud2026-bonnesvolontes', donsnature:'maouloud2026-donsnature',
+  depenses:'maouloud2026-depenses', buses:'maouloud2026-buses',
+  voyageurs:'maouloud2026-voyageurs', synthese:'maouloud2026-synthese',
+  bustransport:'maouloud2026-bustransport'
+};
+
+let members=[], mobilemoney=[], bonnesvolontes=[], donsnature=[], depenses=[], buses=[], voyageurs=[];
+let synthese = {report_caisse:0};
+let busTransport = {destination:'Barobé Diackel', date_depart:'', note:''};
+
+let role = 'membre';
+let mainTab = 'dashboard';
+let catTab = 'overview';
+let searchQuery = '', statusFilter = 'all', sortByReste = false, addFormOpen = false;
+let encQuery = '', encSelectedId = null;
+let sessionLog = [];
+let mmAddOpen = false, bvAddOpen = false, dnAddOpen = false, depAddOpen = false, busAddOpen = false;
+let voyForm = {}; // {busId: {open, isMember, memberQuery, memberId}}
+let dashLookupQuery = '';
+
+function fmt(n){ return (n||0).toLocaleString('fr-FR'); }
+function statusOf(m){ if(m.montant_verse<=0) return 'unpaid'; if(m.montant_verse>=m.montant_attendu) return 'paid'; return 'partial'; }
+
+/* ---------- Printing ---------- */
+function doPrint(html){
+  document.getElementById('printArea').innerHTML = html;
+  setTimeout(()=>window.print(), 50);
+}
+function printHeader(title){
+  const now = new Date().toLocaleDateString('fr-FR', {day:'numeric',month:'long',year:'numeric'});
+  return `<div class="print-header"><h1>${title}</h1><div class="meta">Association Maouloud 2026 — édité le ${now}</div></div>`;
+}
+function printBusManifest(busId){
+  const b = buses.find(x=>x.id===busId);
+  doPrint(`<div class="print-page">${busManifestHtml(b)}</div>`);
+}
+function printAllBuses(){
+  doPrint(buses.map(b=>`<div class="print-page">${busManifestHtml(b)}</div>`).join(''));
+}
+function busManifestHtml(b){
+  const occ = busOccupants(b.id);
+  const rows = occ.map((v,i)=>`<tr><td>${i+1}</td><td>${v.nom}</td><td>${v.est_membre?'Membre':'Non-membre'}</td><td style="width:110px;"></td></tr>`).join('');
+  return printHeader(`Liste d'embarquement — ${b.nom}`) + `
+    <div class="meta">Départ : ${busTransport.depart} → ${busTransport.destination} · Date : ${busTransport.date_depart?formatDateFr(busTransport.date_depart):'à confirmer'} · Capacité : ${b.capacite} places</div>
+    <table class="print-table" style="margin-top:10px;"><thead><tr><th>#</th><th>Nom</th><th>Statut</th><th>Émargement</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="4">Aucun voyageur inscrit.</td></tr>'}</tbody></table>
+    <div class="meta">${occ.length} voyageur(s) sur ${b.capacite} places.</div>
+  `;
+}
+function printDepensesReport(){
+  const rows = depenses.map((x,i)=>{
+    const rel = x.avance - x.justifie;
+    const relLabel = rel>0?`+${fmt(rel)} à restituer`:rel<0?`${fmt(rel)} à compléter`:'Soldé';
+    return `<tr><td>${i+1}</td><td>${x.libelle}</td><td>${x.responsable||'-'}</td><td style="text-align:right;">${fmt(x.avance)}</td><td style="text-align:right;">${fmt(x.justifie)}</td><td>${relLabel}</td></tr>`;
+  }).join('');
+  const totAv = depTotal(), totJu = depJustifieTotal();
+  const html = printHeader('État des dépenses et avances') + `
+    <table class="print-table"><thead><tr><th>#</th><th>Libellé</th><th>Responsable</th><th>Avancé</th><th>Justifié</th><th>Reliquat</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="6">Aucune dépense enregistrée.</td></tr>'}</tbody>
+    <tfoot><tr><td colspan="3" style="text-align:right;"><b>Total</b></td><td style="text-align:right;"><b>${fmt(totAv)}</b></td><td style="text-align:right;"><b>${fmt(totJu)}</b></td><td></td></tr></tfoot></table>
+  `;
+  doPrint(html);
+}
+function printBonnesVolontesReport(){
+  const rows = bonnesvolontes.map((x,i)=>`<tr><td>${i+1}</td><td>${x.nom}</td><td style="text-align:right;">${fmt(x.montant)}</td><td style="text-align:right;">${fmt(x.ziar)}</td></tr>`).join('');
+  const dnRows = donsnature.map((x,i)=>`<tr><td>${i+1}</td><td>${x.donateur}</td><td>${x.article}</td></tr>`).join('');
+  const html = printHeader('État des bonnes volontés') + `
+    <table class="print-table"><thead><tr><th>#</th><th>Nom</th><th>Montant</th><th>Ziar</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="4">Aucun contributeur enregistré.</td></tr>'}</tbody>
+    <tfoot><tr><td style="text-align:right;" colspan="2"><b>Total</b></td><td style="text-align:right;"><b>${fmt(bonnesvolontes.reduce((a,x)=>a+x.montant,0))}</b></td><td style="text-align:right;"><b>${fmt(bonnesvolontes.reduce((a,x)=>a+x.ziar,0))}</b></td></tr></tfoot></table>
+    <h1 style="font-family:Georgia,serif;font-size:15px;margin:16px 0 8px;">Dons en nature</h1>
+    <table class="print-table"><thead><tr><th>#</th><th>Donateur</th><th>Article</th></tr></thead>
+    <tbody>${dnRows || '<tr><td colspan="3">Aucun don en nature.</td></tr>'}</tbody></table>
+  `;
+  doPrint(html);
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=>t.classList.remove('show'), 2000);
+}
+
+let currentUser = null; // {username, display_name, is_admin} or null when logged out
+let loginFormOpen = false;
+
+async function apiLogin(username, password){
+  try{
+    const res = await fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username, password})});
+    if(!res.ok) return null;
+    return await res.json();
+  }catch(e){ return null; }
+}
+async function apiLogout(){
+  try{ await fetch('/api/logout', {method:'POST'}); }catch(e){}
+}
+async function apiMe(){
+  try{
+    const res = await fetch('/api/me');
+    if(res.ok) return await res.json();
+  }catch(e){}
+  return {role:'membre'};
+}
+async function apiListUsers(){
+  try{ const res = await fetch('/api/users'); if(res.ok) return await res.json(); }catch(e){}
+  return [];
+}
+async function apiCreateUser(data){
+  try{
+    const res = await fetch('/api/users', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+    if(res.ok) return {ok:true};
+    const j = await res.json().catch(()=>({}));
+    return {ok:false, error:j.detail||'Erreur'};
+  }catch(e){ return {ok:false, error:'Erreur réseau'}; }
+}
+async function apiDeleteUser(username){
+  try{
+    const res = await fetch('/api/users/'+encodeURIComponent(username), {method:'DELETE'});
+    if(res.ok) return {ok:true};
+    const j = await res.json().catch(()=>({}));
+    return {ok:false, error:j.detail||'Erreur'};
+  }catch(e){ return {ok:false, error:'Erreur réseau'}; }
+}
+async function apiResetPassword(username, password){
+  try{
+    const res = await fetch('/api/users/'+encodeURIComponent(username)+'/password', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({password})});
+    if(res.ok) return {ok:true};
+    const j = await res.json().catch(()=>({}));
+    return {ok:false, error:j.detail||'Erreur'};
+  }catch(e){ return {ok:false, error:'Erreur réseau'}; }
+}
+async function apiAudit(){
+  try{ const res = await fetch('/api/audit'); if(res.ok) return await res.json(); }catch(e){}
+  return [];
+}
+
+async function loadKey(name, seed){
+  try{
+    const res = await fetch('/api/store/'+STORAGE_KEYS[name]);
+    if(res.ok){ const j = await res.json(); return JSON.parse(j.value); }
+  }catch(e){}
+  return JSON.parse(JSON.stringify(seed));
+}
+async function saveKey(name, value, toast=true){
+  try{
+    const res = await fetch('/api/store/'+STORAGE_KEYS[name], {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({value: JSON.stringify(value)})
+    });
+    if(!res.ok){
+      if(res.status===401){ showToast('Session expirée — reconnectez-vous'); currentUser=null; role='membre'; render(); return; }
+      throw new Error('save failed');
+    }
+    if(toast) showToast('Enregistré');
+  }catch(e){ showToast("Erreur d'enregistrement"); }
+}
+let saveTimers = {};
+function saveKeyDebounced(name, value){
+  clearTimeout(saveTimers[name]);
+  saveTimers[name] = setTimeout(()=>saveKey(name, value), 500);
+}
+
+async function loadAll(){
+  [members, mobilemoney, bonnesvolontes, donsnature, depenses, buses, voyageurs, synthese, busTransport] = await Promise.all([
+    loadKey('members', SEED_MEMBERS),
+    loadKey('mobilemoney', SEED_MOBILEMONEY),
+    loadKey('bonnesvolontes', SEED_BONNESVOLONTES),
+    loadKey('donsnature', SEED_DONSNATURE),
+    loadKey('depenses', SEED_DEPENSES),
+    loadKey('buses', SEED_BUSES),
+    loadKey('voyageurs', SEED_VOYAGEURS),
+    loadKey('synthese', SEED_SYNTHESE),
+    loadKey('bustransport', SEED_BUSTRANSPORT),
+  ]);
+}
+
+/* ---------- Aggregates ---------- */
+function globalCotisStats(){
+  let attendu=0, verse=0, paid=0, partial=0, unpaid=0;
+  members.forEach(m=>{
+    attendu += m.montant_attendu; verse += m.montant_verse;
+    const s = statusOf(m);
+    if(s==='paid') paid++; else if(s==='partial') partial++; else unpaid++;
+  });
+  const rate = attendu>0 ? Math.round((verse/attendu)*100) : 0;
+  return {attendu, verse, reste: Math.max(attendu-verse,0), rate, paid, partial, unpaid, count: members.length};
+}
+function catStats(catKey){
+  const list = members.filter(m=>m.categorie===catKey);
+  let attendu=0, verse=0;
+  list.forEach(m=>{attendu+=m.montant_attendu; verse+=m.montant_verse;});
+  const rate = attendu>0 ? Math.round((verse/attendu)*100) : 0;
+  return {attendu, verse, count:list.length, rate};
+}
+function mmTotal(){ return mobilemoney.reduce((a,x)=>a+x.montant,0); }
+function bvTotal(){ return bonnesvolontes.reduce((a,x)=>a+x.montant+x.ziar,0); }
+function depTotal(){ return depenses.reduce((a,x)=>a+x.avance,0); }
+function depJustifieTotal(){ return depenses.reduce((a,x)=>a+x.justifie,0); }
+
+function synthLines(){
+  const gs = globalCotisStats();
+  const totalCotis = gs.verse + mmTotal();
+  const totalCotisBV = totalCotis + bvTotal();
+  const totalCaisse = (synthese.report_caisse||0) + totalCotisBV;
+  const totalDep = depTotal();
+  const solde = totalCaisse - totalDep;
+  return {gs, totalCotis, bv:bvTotal(), totalCotisBV, totalCaisse, totalDep, solde};
+}
+
+/* ---------- Shell ---------- */
+const MAIN_TABS = [
+  {key:'dashboard', label:'Tableau de bord', roles:['comite','membre']},
+  {key:'encaissement', label:'Encaissement', roles:['comite']},
+  {key:'cotisations', label:'Cotisations', roles:['comite','membre']},
+  {key:'mobilemoney', label:'Wave / Orange Money', roles:['comite','membre']},
+  {key:'bonnesvolontes', label:'Bonnes volontés', roles:['comite','membre']},
+  {key:'depenses', label:'Dépenses', roles:['comite','membre']},
+  {key:'bus', label:'Bus & voyageurs', roles:['comite','membre']},
+  {key:'comptes', label:'Comptes', roles:['comite'], adminOnly:true},
+];
+
+function render(){
+  const app = document.getElementById('app');
+  const gs = globalCotisStats();
+  const isAdmin = !!(currentUser && currentUser.is_admin);
+  const visibleTabs = MAIN_TABS.filter(t=>t.roles.includes(role) && (!t.adminOnly || isAdmin));
+  if(!visibleTabs.find(t=>t.key===mainTab)) mainTab = 'dashboard';
+
+  app.innerHTML = `
+    <div class="masthead">
+      <div>
+        <div class="eyebrow">Maouloud 2026</div>
+        <h1>Gestion de l'association</h1>
+        <p class="sub">${gs.count} membres · ${buses.length} bus · ${currentUser ? ('Connecté : '+currentUser.display_name+(isAdmin?' (admin)':'')) : 'Consultation publique'}</p>
+      </div>
+      <div class="role-toggle" style="align-items:center;gap:4px;">
+        ${currentUser
+          ? `<span style="font-size:12px;color:var(--ink-soft);padding:0 6px;">${currentUser.display_name}</span><button id="logoutBtn">Déconnexion</button>`
+          : `<button id="loginToggleBtn">${loginFormOpen?'Annuler':'Se connecter'}</button>`}
+      </div>
+    </div>
+    ${(!currentUser && loginFormOpen) ? `
+    <div class="addform open" id="loginForm" style="margin-bottom:14px;">
+      <input type="text" id="login-username" placeholder="Nom d'utilisateur" autocomplete="username"/>
+      <input type="password" id="login-password" placeholder="Mot de passe" autocomplete="current-password"/>
+      <button class="btn primary" id="loginSubmitBtn">Connexion</button>
+    </div>` : ''}
+    <div class="mainnav" id="mainnav"></div>
+    <div id="panel"></div>
+  `;
+
+  const nav = document.getElementById('mainnav');
+  nav.innerHTML = visibleTabs.map(t=>`<div class="navbtn ${mainTab===t.key?'active':''}" data-tab="${t.key}">${t.label}</div>`).join('');
+  nav.querySelectorAll('.navbtn').forEach(el=>{ el.onclick = ()=>{ mainTab = el.dataset.tab; encSelectedId=null; render(); }; });
+
+  const loginToggleBtn = document.getElementById('loginToggleBtn');
+  if(loginToggleBtn) loginToggleBtn.onclick = ()=>{ loginFormOpen = !loginFormOpen; render(); };
+  const loginSubmitBtn = document.getElementById('loginSubmitBtn');
+  if(loginSubmitBtn) loginSubmitBtn.onclick = async ()=>{
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    if(!username || !password){ showToast('Nom d\'utilisateur et mot de passe requis'); return; }
+    const res = await apiLogin(username, password);
+    if(!res){ showToast('Identifiants incorrects'); return; }
+    currentUser = {username: res.username, display_name: res.display_name, is_admin: res.role==='admin'};
+    role = 'comite'; loginFormOpen = false;
+    render();
+  };
+  const logoutBtn = document.getElementById('logoutBtn');
+  if(logoutBtn) logoutBtn.onclick = async ()=>{
+    await apiLogout();
+    currentUser = null; role = 'membre'; mainTab = 'dashboard';
+    render();
+  };
+
+  const panel = document.getElementById('panel');
+  if(mainTab==='dashboard') renderDashboard(panel);
+  else if(mainTab==='encaissement') renderEncaissement(panel);
+  else if(mainTab==='cotisations') renderCotisationsModule(panel);
+  else if(mainTab==='mobilemoney') renderMobileMoney(panel);
+  else if(mainTab==='bonnesvolontes') renderBonnesVolontes(panel);
+  else if(mainTab==='depenses') renderDepenses(panel);
+  else if(mainTab==='bus') renderBus(panel);
+  else if(mainTab==='comptes') renderComptes(panel);
+}
+
+/* ---------- Dashboard ---------- */
+function renderDashboard(panel){
+  const s = synthLines();
+  panel.innerHTML = `
+    <div class="panel">
+      <h2>Tableau de bord — Synthèse de caisse</h2>
+      <p class="lede">Vue consolidée : cotisations, mobile money, bonnes volontés et dépenses.</p>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="v num">${fmt(s.totalCaisse)}</div><div class="l">Total caisse (FCFA)</div>
+          <div class="gauge on-dark"><div class="gauge-fill" style="width:${s.gs.rate}%"></div></div>
+        </div>
+        <div class="kpi-card alt"><div class="v num">${fmt(s.totalDep)}</div><div class="l">Total dépenses</div></div>
+        <div class="kpi-card alt"><div class="v num">${fmt(s.solde)}</div><div class="l">Solde de caisse</div></div>
+        <div class="kpi-card alt"><div class="v num">${s.gs.rate}%</div><div class="l">Taux de recouvrement cotisations</div></div>
+      </div>
+
+      ${role==='membre' ? renderSelfLookup() : ''}
+
+      <table class="synth-table">
+        <tr><td class="lbl">Report caisse (année précédente)</td><td class="val num">
+          ${role==='comite' ? `<input type="number" id="reportInput" value="${synthese.report_caisse}"/>` : fmt(synthese.report_caisse)}
+        </td></tr>
+        ${CATEGORIES.map(c=>{
+          const cs = catStats(c.key);
+          return `<tr><td class="lbl">${c.label} — collecté</td><td class="val num">${fmt(cs.verse)}</td></tr>`;
+        }).join('')}
+        <tr><td class="lbl">Cotisations Wave / Orange Money</td><td class="val num">${fmt(mmTotal())}</td></tr>
+        <tr class="total"><td class="lbl">Total cotisations</td><td class="val num">${fmt(s.totalCotis)}</td></tr>
+        <tr><td class="lbl">Bonnes volontés (dons + ziar)</td><td class="val num">${fmt(s.bv)}</td></tr>
+        <tr class="total"><td class="lbl">Cotisations + Bonnes volontés</td><td class="val num">${fmt(s.totalCotisBV)}</td></tr>
+        <tr class="total"><td class="lbl">Total caisse</td><td class="val num">${fmt(s.totalCaisse)}</td></tr>
+        <tr><td class="lbl">Dépenses (avances décaissées)</td><td class="val num">${fmt(s.totalDep)}</td></tr>
+        <tr class="solde"><td class="lbl">Solde de caisse</td><td class="val num">${fmt(s.solde)}</td></tr>
+      </table>
+
+      <p class="note"><b>Méthode :</b> le solde de caisse retire les montants avancés pour les dépenses (l'argent déjà sorti de la caisse). Le suivi avance / justifié / reliquat, dans l'onglet Dépenses, sert au contrôle interne et n'affecte pas ce solde tant que le reliquat n'a pas été restitué.</p>
+    </div>
+  `;
+  if(role==='comite'){
+    const ri = document.getElementById('reportInput');
+    if(ri) ri.onchange = (e)=>{
+      let v = parseInt(e.target.value); if(isNaN(v)) v=0;
+      synthese.report_caisse = v; saveKeyDebounced('synthese', synthese); renderDashboard(panel);
+    };
+  }
+  const lookupInput = document.getElementById('dashLookup');
+  if(lookupInput){
+    lookupInput.oninput = (e)=>{ dashLookupQuery = e.target.value; renderDashboard(panel);
+      const el = document.getElementById('dashLookup'); el.focus(); el.setSelectionRange(dashLookupQuery.length, dashLookupQuery.length); };
+  }
+}
+
+function renderSelfLookup(){
+  let resultHtml = '';
+  if(dashLookupQuery.trim().length>1){
+    const q = dashLookupQuery.trim().toLowerCase();
+    const matches = members.filter(m=>(m.prenom+' '+m.nom).toLowerCase().includes(q)).slice(0,5);
+    if(matches.length===0){
+      resultHtml = `<div class="self-result">Aucun membre trouvé pour « ${dashLookupQuery} ».</div>`;
+    }else{
+      resultHtml = matches.map(m=>{
+        const cat = CATEGORIES.find(c=>c.key===m.categorie);
+        const reste = Math.max(m.montant_attendu-m.montant_verse,0);
+        const st = statusOf(m);
+        const myBus = voyageurs.find(v=>v.est_membre && v.membre_id===m.id);
+        const busName = myBus ? (buses.find(b=>b.id===myBus.bus_id)||{}).nom : null;
+        return `<div class="self-result">
+          <div style="font-weight:700;font-size:14px;">${m.prenom} ${m.nom}</div>
+          <div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">${cat?cat.label:''}</div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;">
+            <span>Attendu : <b class="num">${fmt(m.montant_attendu)}</b></span>
+            <span>Versé : <b class="num">${fmt(m.montant_verse)}</b></span>
+            <span>Reste : <b class="num">${fmt(reste)}</b></span>
+            <span class="badge ${st}">${st==='paid'?'Payé':st==='partial'?'Partiel':'Non payé'}</span>
+          </div>
+          ${busName ? `<div style="margin-top:8px;font-size:12.5px;">Bus : <b>${busName}</b></div>` : ''}
+        </div>`;
+      }).join('');
+    }
+  }
+  return `
+    <div class="self-lookup">
+      <h3>Rechercher mon statut</h3>
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="dashLookup" placeholder="Tapez votre nom..." value="${dashLookupQuery}"/>
+      </div>
+      ${resultHtml}
+    </div>
+  `;
+}
+
+/* ---------- Encaissement (cashier — category-blind search) ---------- */
+function renderEncaissement(panel){
+  let resultsHtml = '';
+  if(encQuery.trim().length>0 && encSelectedId===null){
+    const q = encQuery.trim().toLowerCase();
+    const matches = members.filter(m=>(m.prenom+' '+m.nom).toLowerCase().includes(q)).slice(0,10);
+    resultsHtml = matches.length===0
+      ? `<div class="empty">Aucun membre trouvé.</div>`
+      : `<div class="enc-results">${matches.map(m=>{
+          const reste = Math.max(m.montant_attendu-m.montant_verse,0);
+          return `<div class="enc-result" data-id="${m.id}">
+            <div><div class="n">${m.prenom} ${m.nom}</div><div class="c">${statusOf(m)==='paid'?'Déjà à jour':'Reste '+fmt(reste)+' FCFA'}</div></div>
+            <span class="badge ${statusOf(m)}">${statusOf(m)==='paid'?'Payé':statusOf(m)==='partial'?'Partiel':'Non payé'}</span>
+          </div>`;
+        }).join('')}</div>`;
+  }
+
+  let receiptHtml = '';
+  const sel = encSelectedId!==null ? members.find(m=>m.id===encSelectedId) : null;
+  if(sel){
+    const cat = CATEGORIES.find(c=>c.key===sel.categorie);
+    const reste = Math.max(sel.montant_attendu-sel.montant_verse,0);
+    receiptHtml = `
+      <div class="receipt">
+        <div class="receipt-head">
+          <div><div class="n">${sel.prenom} ${sel.nom}</div><div class="c">${cat?cat.label:''} · ${fmt(cat?cat.base:0)} FCFA de base</div></div>
+          <button class="btn ghost sm" id="encCancel">Fermer</button>
+        </div>
+        <div class="receipt-grid">
+          <div><div class="l">Attendu</div><div class="v num">${fmt(sel.montant_attendu)}</div></div>
+          <div><div class="l">Déjà versé</div><div class="v num">${fmt(sel.montant_verse)}</div></div>
+          <div><div class="l">Reste</div><div class="v num">${fmt(reste)}</div></div>
+        </div>
+        <div class="receipt-input">
+          <div class="fld"><label>Montant reçu maintenant (FCFA)</label><input type="number" id="encAmount" min="0" placeholder="0"/></div>
+          <button class="btn primary" id="encSave">Enregistrer le versement</button>
+        </div>
+      </div>
+    `;
+  }
+
+  panel.innerHTML = `
+    <div class="panel">
+      <h2>Encaissement</h2>
+      <p class="lede">Recherchez un membre par son nom — la catégorie est retrouvée automatiquement, pas besoin de la connaître à l'avance.</p>
+      <div class="enc-search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="encInput" placeholder="Nom du membre..." value="${encQuery}" autocomplete="off"/>
+      </div>
+      ${receiptHtml || resultsHtml}
+      <div class="session-log">
+        <h4>Encaissements de cette session</h4>
+        ${sessionLog.length===0 ? `<div class="empty">Aucun encaissement enregistré pour l'instant.</div>` :
+          sessionLog.slice().reverse().map(l=>`<div class="log-item"><span>${l.nom} — <b class="num">${fmt(l.montant)}</b> FCFA</span><span class="t">${l.time}</span></div>`).join('')}
+      </div>
+    </div>
+  `;
+
+  const input = document.getElementById('encInput');
+  input.oninput = (e)=>{ encQuery = e.target.value; encSelectedId=null; renderEncaissement(panel);
+    const el = document.getElementById('encInput'); el.focus(); el.setSelectionRange(encQuery.length, encQuery.length); };
+
+  panel.querySelectorAll('.enc-result').forEach(el=>{
+    el.onclick = ()=>{ encSelectedId = parseInt(el.dataset.id); renderEncaissement(panel); };
+  });
+  const cancelBtn = document.getElementById('encCancel');
+  if(cancelBtn) cancelBtn.onclick = ()=>{ encSelectedId=null; encQuery=''; renderEncaissement(panel); };
+  const saveBtn = document.getElementById('encSave');
+  if(saveBtn) saveBtn.onclick = ()=>{
+    const amtInput = document.getElementById('encAmount');
+    let amt = parseInt(amtInput.value);
+    if(isNaN(amt) || amt<=0){ showToast('Entrez un montant valide'); return; }
+    const m = members.find(x=>x.id===encSelectedId);
+    m.montant_verse += amt;
+    saveKey('members', members, true);
+    sessionLog.push({nom:`${m.prenom} ${m.nom}`, montant:amt, time:new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})});
+    encSelectedId=null; encQuery='';
+    renderEncaissement(panel);
+  };
+}
+
+/* ---------- Cotisations module (category browsing, existing logic) ---------- */
+function renderCotisationsModule(panel){
+  panel.innerHTML = `
+    <div class="panel">
+      <h2>Cotisations par catégorie</h2>
+      <p class="lede">Vue détaillée et corrections par catégorie. Pour un encaissement rapide, utilisez l'onglet Encaissement.</p>
+      <div class="subtabs" id="subtabs"></div>
+      <div class="subpanel" id="subpanel"></div>
+    </div>
+  `;
+  renderCotSubtabs();
+  renderCotSubpanel();
+}
+function renderCotSubtabs(){
+  const el = document.getElementById('subtabs');
+  const tabs = [{key:'overview', label:"Vue d'ensemble"}].concat(CATEGORIES.map((c,i)=>({key:c.key, label:c.label, n:i+1})));
+  el.innerHTML = tabs.map(t=>`<div class="subtab ${catTab===t.key?'active':''}" data-tab="${t.key}">${t.n?`<span class="n">${t.n}</span>`:''}${t.label}</div>`).join('');
+  el.querySelectorAll('.subtab').forEach(e=>{ e.onclick=()=>{ catTab=e.dataset.tab; searchQuery=''; renderCotSubtabs(); renderCotSubpanel(); }; });
+}
+function renderCotSubpanel(){
+  const sp = document.getElementById('subpanel');
+  if(catTab==='overview'){
+    sp.innerHTML = `<div class="mlist">${CATEGORIES.map((c,i)=>{
+      const s = catStats(c.key);
+      return `<div class="mrow" style="grid-template-columns:28px 1.4fr 1fr 1fr 1fr;cursor:pointer" data-goto="${c.key}">
+        <div class="idx num">${i+1}</div>
+        <div><div class="name">${c.label}</div><div class="cat-badge">${fmt(c.base)} FCFA / membre · ${s.count} membres</div></div>
+        <div class="field"><div class="l">Attendu</div><div class="v num">${fmt(s.attendu)}</div></div>
+        <div class="field"><div class="l">Collecté</div><div class="v num">${fmt(s.verse)}</div></div>
+        <div class="field"><div class="l">Taux</div><div class="v num">${s.rate}%</div></div>
+      </div>`;
+    }).join('')}</div>`;
+    sp.querySelectorAll('[data-goto]').forEach(e=>{ e.onclick=()=>{ catTab=e.dataset.goto; renderCotSubtabs(); renderCotSubpanel(); }; });
+    return;
+  }
+  const cat = CATEGORIES.find(c=>c.key===catTab);
+  const s = catStats(cat.key);
+  let list = members.filter(m=>m.categorie===cat.key);
+  if(searchQuery.trim()){ const q=searchQuery.trim().toLowerCase(); list = list.filter(m=>(m.prenom+' '+m.nom).toLowerCase().includes(q)); }
+  if(statusFilter!=='all') list = list.filter(m=>statusOf(m)===statusFilter);
+  if(sortByReste) list = list.slice().sort((a,b)=>(b.montant_attendu-b.montant_verse)-(a.montant_attendu-a.montant_verse));
+
+  sp.innerHTML = `
+    <div class="cat-head">
+      <div><h3>${cat.label}</h3><div class="base-amount">Montant de base : ${fmt(cat.base)} FCFA</div></div>
+      <div class="cat-stats"><span><b>${s.count}</b> membres</span><span><b class="num">${fmt(s.attendu)}</b> attendu</span><span><b class="num">${fmt(s.verse)}</b> collecté</span><span><b>${s.rate}%</b> taux</span></div>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchInput" placeholder="Rechercher un nom..." value="${searchQuery}"/></div>
+      <select class="filter" id="statusFilter">
+        <option value="all" ${statusFilter==='all'?'selected':''}>Tous les statuts</option>
+        <option value="paid" ${statusFilter==='paid'?'selected':''}>Payé</option>
+        <option value="partial" ${statusFilter==='partial'?'selected':''}>Partiel</option>
+        <option value="unpaid" ${statusFilter==='unpaid'?'selected':''}>Non payé</option>
+      </select>
+      <button class="btn" id="sortBtn">${sortByReste?'✓ ':''}Trier par reste à payer</button>
+      ${role==='comite' ? `<button class="btn primary" id="addBtn">+ Ajouter un membre</button>` : ''}
+    </div>
+    ${role==='comite' ? `<div class="addform ${addFormOpen?'open':''}" id="addForm">
+      <input type="text" id="nf-prenom" placeholder="Prénom(s)"/>
+      <input type="text" id="nf-nom" placeholder="Nom"/>
+      <input type="number" id="nf-attendu" placeholder="Montant attendu" value="${cat.base}"/>
+      <button class="btn primary" id="saveNewBtn">Enregistrer</button>
+      <button class="btn ghost" id="cancelNewBtn">Annuler</button>
+    </div>` : ''}
+    <div class="mlist" id="mlist" style="margin-top:14px;">
+      ${list.length===0 ? `<div class="empty">Aucun membre ne correspond à cette recherche.</div>` : list.map((m,i)=>renderMemberRow(m,i)).join('')}
+    </div>
+  `;
+  document.getElementById('searchInput').oninput = (e)=>{ searchQuery=e.target.value; renderCotSubpanel();
+    const el=document.getElementById('searchInput'); el.focus(); el.setSelectionRange(searchQuery.length, searchQuery.length); };
+  document.getElementById('statusFilter').onchange = (e)=>{ statusFilter=e.target.value; renderCotSubpanel(); };
+  document.getElementById('sortBtn').onclick = ()=>{ sortByReste=!sortByReste; renderCotSubpanel(); };
+
+  if(role==='comite'){
+    const addBtn = document.getElementById('addBtn');
+    if(addBtn) addBtn.onclick = ()=>{ addFormOpen=!addFormOpen; renderCotSubpanel(); };
+    const saveNewBtn = document.getElementById('saveNewBtn');
+    if(saveNewBtn) saveNewBtn.onclick = ()=>{
+      const prenom = document.getElementById('nf-prenom').value.trim();
+      const nom = document.getElementById('nf-nom').value.trim();
+      const attendu = parseInt(document.getElementById('nf-attendu').value) || cat.base;
+      if(!prenom){ showToast('Le prénom est obligatoire'); return; }
+      const maxId = members.reduce((a,m)=>Math.max(a,m.id),0);
+      members.push({id:maxId+1, categorie:cat.key, base:cat.base, prenom, nom, montant_attendu:attendu, montant_verse:0, historique:{}, observation:'', bus:''});
+      addFormOpen=false; saveKey('members', members, true); renderCotSubpanel();
+    };
+    const cancelNewBtn = document.getElementById('cancelNewBtn');
+    if(cancelNewBtn) cancelNewBtn.onclick = ()=>{ addFormOpen=false; renderCotSubpanel(); };
+    document.querySelectorAll('.verse-input').forEach(inp=>{
+      inp.onchange = (e)=>{
+        const id = parseInt(e.target.dataset.id); const m = members.find(x=>x.id===id);
+        let v = parseInt(e.target.value); if(isNaN(v)||v<0) v=0;
+        m.montant_verse=v; saveKeyDebounced('members', members); renderCotSubpanel();
+      };
+    });
+  }
+}
+function renderMemberRow(m, i){
+  const st = statusOf(m);
+  const badgeLabel = st==='paid'?'Payé':st==='partial'?'Partiel':'Non payé';
+  const reste = Math.max(m.montant_attendu-m.montant_verse,0);
+  const verseCell = role==='comite'
+    ? `<input type="number" class="verse-input" data-id="${m.id}" value="${m.montant_verse}" min="0"/>`
+    : `<div class="v num">${fmt(m.montant_verse)}</div>`;
+  return `<div class="mrow cot">
+    <div class="idx num">${i+1}</div>
+    <div class="name">${m.prenom} ${m.nom||''}</div>
+    <div class="field f-attendu"><div class="l">Attendu</div><div class="v num">${fmt(m.montant_attendu)}</div></div>
+    <div class="field f-verse"><div class="l">Versé</div>${verseCell}</div>
+    <div class="field f-reste"><div class="l">Reste</div><div class="v num">${fmt(reste)}</div></div>
+    <span class="badge ${st}">${badgeLabel}</span>
+    ${m.observation || m.bus ? `<div class="obs">${[m.bus?('Bus: '+m.bus):null, m.observation].filter(Boolean).join(' · ')}</div>` : ''}
+  </div>`;
+}
+
+/* ---------- Mobile Money ---------- */
+function renderMobileMoney(panel){
+  const total = mmTotal();
+  panel.innerHTML = `
+    <div class="panel">
+      <h2>Wave / Orange Money</h2>
+      <p class="lede">Cotisations reçues par mobile money, ajoutées automatiquement au total de la caisse.</p>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="v num">${fmt(total)}</div><div class="l">Total mobile money</div></div>
+        <div class="kpi-card alt"><div class="v num">${mobilemoney.length}</div><div class="l">Transactions</div></div>
+      </div>
+      ${role==='comite' ? `<div class="toolbar"><button class="btn primary" id="mmAddBtn">+ Ajouter un versement</button></div>
+      <div class="addform ${mmAddOpen?'open':''}" id="mmAddForm">
+        <input type="text" id="mm-nom" placeholder="Prénom et nom"/>
+        <select id="mm-op"><option value="WAVE">Wave</option><option value="Orange Money">Orange Money</option></select>
+        <input type="number" id="mm-montant" placeholder="Montant"/>
+        <button class="btn primary" id="mmSaveBtn">Enregistrer</button>
+        <button class="btn ghost" id="mmCancelBtn">Annuler</button>
+      </div>` : ''}
+      <div class="mlist" style="margin-top:14px;">
+        ${mobilemoney.length===0 ? `<div class="empty">Aucun versement enregistré.</div>` : mobilemoney.map((x,i)=>`
+        <div class="mrow" style="grid-template-columns:28px 1.6fr 1fr 1fr ${role==='comite'?'60px':''};">
+          <div class="idx num">${i+1}</div>
+          <div class="name">${x.nom}</div>
+          <div class="field"><div class="l">Opérateur</div><div class="v">${x.operateur}</div></div>
+          <div class="field"><div class="l">Montant</div><div class="v num">${fmt(x.montant)}</div></div>
+          ${role==='comite' ? `<button class="btn danger-ghost" data-del="${x.id}">Suppr.</button>` : ''}
+        </div>`).join('')}
+      </div>
+    </div>
+  `;
+  if(role==='comite'){
+    document.getElementById('mmAddBtn').onclick = ()=>{ mmAddOpen=!mmAddOpen; renderMobileMoney(panel); };
+    const cancelBtn = document.getElementById('mmCancelBtn');
+    if(cancelBtn) cancelBtn.onclick = ()=>{ mmAddOpen=false; renderMobileMoney(panel); };
+    const saveBtn = document.getElementById('mmSaveBtn');
+    if(saveBtn) saveBtn.onclick = ()=>{
+      const nom = document.getElementById('mm-nom').value.trim();
+      const op = document.getElementById('mm-op').value;
+      const montant = parseInt(document.getElementById('mm-montant').value) || 0;
+      if(!nom || montant<=0){ showToast('Nom et montant requis'); return; }
+      const maxId = mobilemoney.reduce((a,x)=>Math.max(a,x.id),0);
+      mobilemoney.push({id:maxId+1, nom, operateur:op, montant});
+      mmAddOpen=false; saveKey('mobilemoney', mobilemoney, true); renderMobileMoney(panel);
+    };
+    panel.querySelectorAll('[data-del]').forEach(b=>{
+      b.onclick = ()=>{ mobilemoney = mobilemoney.filter(x=>x.id!==parseInt(b.dataset.del)); saveKey('mobilemoney', mobilemoney, true); renderMobileMoney(panel); };
+    });
+  }
+}
+
+/* ---------- Bonnes Volontés ---------- */
+function renderBonnesVolontes(panel){
+  const total = bvTotal();
+  panel.innerHTML = `
+    <div class="panel">
+      <h2>Bonnes volontés</h2>
+      <p class="lede">Sympathisants et ressortissants hors catégories fixes (diaspora, amis de l'association).</p>
+      <div class="kpi-grid" style="margin-bottom:16px;">
+        <div class="kpi-card"><div class="v num">${fmt(total)}</div><div class="l">Total dons + ziar</div></div>
+        <div class="kpi-card alt"><div class="v num">${bonnesvolontes.length}</div><div class="l">Contributeurs</div></div>
+        <div class="kpi-card alt"><div class="v num">${donsnature.length}</div><div class="l">Dons en nature</div></div>
+      </div>
+      <div class="toolbar"><button class="btn" id="bvPrintBtn">🖨 Imprimer l'état</button>${role==='comite' ? `<button class="btn primary" id="bvAddBtn">+ Ajouter un contributeur</button>` : ''}</div>
+      ${role==='comite' ? `<div class="addform ${bvAddOpen?'open':''}" id="bvAddForm">
+        <input type="text" id="bv-nom" placeholder="Nom / Raison sociale"/>
+        <input type="number" id="bv-montant" placeholder="Montant"/>
+        <input type="number" id="bv-ziar" placeholder="Ziar"/>
+        <input type="text" id="bv-obs" placeholder="Observation (optionnel)"/>
+        <button class="btn primary" id="bvSaveBtn">Enregistrer</button>
+        <button class="btn ghost" id="bvCancelBtn">Annuler</button>
+      </div>` : ''}
+      <div class="mlist" style="margin-top:14px;">
+        ${bonnesvolontes.length===0 ? `<div class="empty">Aucun contributeur enregistré.</div>` : bonnesvolontes.map((x,i)=>`
+        <div class="mrow" style="grid-template-columns:28px 1.6fr 1fr 1fr ${role==='comite'?'60px':''};">
+          <div class="idx num">${i+1}</div>
+          <div class="name">${x.nom}${x.observation?`<div class="cat-badge">${x.observation}</div>`:''}</div>
+          <div class="field"><div class="l">Montant</div><div class="v num">${fmt(x.montant)}</div></div>
+          <div class="field"><div class="l">Ziar</div><div class="v num">${fmt(x.ziar)}</div></div>
+          ${role==='comite' ? `<button class="btn danger-ghost" data-del="${x.id}">Suppr.</button>` : ''}
+        </div>`).join('')}
+      </div>
+
+      <div class="section-gap">
+        <div class="cat-head"><h3>Dons en nature</h3>
+          ${role==='comite' ? `<button class="btn sm" id="dnAddBtn">+ Ajouter un don</button>` : ''}
+        </div>
+        <div class="addform ${dnAddOpen?'open':''}" id="dnAddForm">
+          <input type="text" id="dn-donateur" placeholder="Donateur"/>
+          <input type="text" id="dn-article" placeholder="Article donné"/>
+          <button class="btn primary" id="dnSaveBtn">Enregistrer</button>
+          <button class="btn ghost" id="dnCancelBtn">Annuler</button>
+        </div>
+        <div class="mlist" style="margin-top:12px;">
+          ${donsnature.length===0 ? `<div class="empty">Aucun don en nature enregistré.</div>` : donsnature.map((x,i)=>`
+          <div class="mrow" style="grid-template-columns:28px 1.6fr 1fr ${role==='comite'?'60px':''};">
+            <div class="idx num">${i+1}</div>
+            <div class="name">${x.donateur}</div>
+            <div class="field"><div class="l">Article</div><div class="v">${x.article}</div></div>
+            ${role==='comite' ? `<button class="btn danger-ghost" data-deldn="${x.id}">Suppr.</button>` : ''}
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('bvPrintBtn').onclick = ()=>printBonnesVolontesReport();
+  if(role==='comite'){
+    document.getElementById('bvAddBtn').onclick = ()=>{ bvAddOpen=!bvAddOpen; renderBonnesVolontes(panel); };
+    const bvCancel = document.getElementById('bvCancelBtn'); if(bvCancel) bvCancel.onclick=()=>{ bvAddOpen=false; renderBonnesVolontes(panel); };
+    const bvSave = document.getElementById('bvSaveBtn');
+    if(bvSave) bvSave.onclick = ()=>{
+      const nom = document.getElementById('bv-nom').value.trim();
+      const montant = parseInt(document.getElementById('bv-montant').value)||0;
+      const ziar = parseInt(document.getElementById('bv-ziar').value)||0;
+      const obs = document.getElementById('bv-obs').value.trim();
+      if(!nom){ showToast('Le nom est obligatoire'); return; }
+      const maxId = bonnesvolontes.reduce((a,x)=>Math.max(a,x.id),0);
+      bonnesvolontes.push({id:maxId+1, nom, montant, ziar, observation:obs});
+      bvAddOpen=false; saveKey('bonnesvolontes', bonnesvolontes, true); renderBonnesVolontes(panel);
+    };
+    panel.querySelectorAll('[data-del]').forEach(b=>{ b.onclick=()=>{ bonnesvolontes=bonnesvolontes.filter(x=>x.id!==parseInt(b.dataset.del)); saveKey('bonnesvolontes', bonnesvolontes, true); renderBonnesVolontes(panel); }; });
+
+    const dnBtn = document.getElementById('dnAddBtn');
+    if(dnBtn) dnBtn.onclick = ()=>{ dnAddOpen=!dnAddOpen; renderBonnesVolontes(panel); };
+    const dnCancel = document.getElementById('dnCancelBtn'); if(dnCancel) dnCancel.onclick=()=>{ dnAddOpen=false; renderBonnesVolontes(panel); };
+    const dnSave = document.getElementById('dnSaveBtn');
+    if(dnSave) dnSave.onclick = ()=>{
+      const donateur = document.getElementById('dn-donateur').value.trim();
+      const article = document.getElementById('dn-article').value.trim();
+      if(!donateur || !article){ showToast('Donateur et article requis'); return; }
+      const maxId = donsnature.reduce((a,x)=>Math.max(a,x.id),0);
+      donsnature.push({id:maxId+1, donateur, article});
+      dnAddOpen=false; saveKey('donsnature', donsnature, true); renderBonnesVolontes(panel);
+    };
+    panel.querySelectorAll('[data-deldn]').forEach(b=>{ b.onclick=()=>{ donsnature=donsnature.filter(x=>x.id!==parseInt(b.dataset.deldn)); saveKey('donsnature', donsnature, true); renderBonnesVolontes(panel); }; });
+  }
+}
+
+/* ---------- Dépenses ---------- */
+function reliquatBadge(av, ju){
+  const r = av - ju;
+  if(r>0) return `<span class="badge pos">+${fmt(r)} à restituer</span>`;
+  if(r<0) return `<span class="badge neg">${fmt(r)} à compléter</span>`;
+  return `<span class="badge zero">Soldé</span>`;
+}
+function renderDepenses(panel){
+  const totalAv = depTotal(), totalJu = depJustifieTotal();
+  panel.innerHTML = `
+    <div class="panel">
+      <h2>Dépenses & avances</h2>
+      <p class="lede">Suivi des dépenses de l'événement, des avances remises et du reliquat à justifier.</p>
+      <div class="kpi-grid" style="margin-bottom:16px;">
+        <div class="kpi-card"><div class="v num">${fmt(totalAv)}</div><div class="l">Total avancé (2026)</div></div>
+        <div class="kpi-card alt"><div class="v num">${fmt(totalJu)}</div><div class="l">Total justifié</div></div>
+        <div class="kpi-card alt"><div class="v num">${fmt(totalAv-totalJu)}</div><div class="l">Reliquat net</div></div>
+      </div>
+      <div class="toolbar"><button class="btn" id="depPrintBtn">🖨 Imprimer l'état</button>${role==='comite' ? `<button class="btn primary" id="depAddBtn">+ Ajouter une dépense</button>` : ''}</div>
+      ${role==='comite' ? `<div class="addform ${depAddOpen?'open':''}" id="depAddForm">
+        <input type="text" id="dep-libelle" placeholder="Libellé de la dépense"/>
+        <input type="text" id="dep-resp" placeholder="Responsable"/>
+        <button class="btn primary" id="depSaveBtn">Enregistrer</button>
+        <button class="btn ghost" id="depCancelBtn">Annuler</button>
+      </div>` : ''}
+      <div class="mlist" style="margin-top:14px;">
+        ${depenses.length===0 ? `<div class="empty">Aucune dépense enregistrée.</div>` : depenses.map((x,i)=>{
+          const histo = Object.keys(x.historique||{}).sort().map(y=>`${y}: ${fmt(x.historique[y])}`).join(' · ');
+          const avCell = role==='comite' ? `<input type="number" class="dep-av" data-id="${x.id}" value="${x.avance}" min="0"/>` : `<div class="v num">${fmt(x.avance)}</div>`;
+          const juCell = role==='comite' ? `<input type="number" class="dep-ju" data-id="${x.id}" value="${x.justifie}" min="0"/>` : `<div class="v num">${fmt(x.justifie)}</div>`;
+          return `<div class="mrow" style="grid-template-columns:28px 1.4fr 1fr 1fr 110px;">
+            <div class="idx num">${i+1}</div>
+            <div><div class="name">${x.libelle}</div><div class="cat-badge">${x.responsable?('Resp. '+x.responsable):'Sans responsable désigné'}</div></div>
+            <div class="field"><div class="l">Avancé 2026</div>${avCell}</div>
+            <div class="field"><div class="l">Justifié</div>${juCell}</div>
+            ${reliquatBadge(x.avance, x.justifie)}
+            ${histo ? `<div class="obs">Historique : ${histo}</div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+  `;
+  document.getElementById('depPrintBtn').onclick = ()=>printDepensesReport();
+  if(role==='comite'){
+    document.getElementById('depAddBtn').onclick = ()=>{ depAddOpen=!depAddOpen; renderDepenses(panel); };
+    const cancel = document.getElementById('depCancelBtn'); if(cancel) cancel.onclick=()=>{ depAddOpen=false; renderDepenses(panel); };
+    const save = document.getElementById('depSaveBtn');
+    if(save) save.onclick = ()=>{
+      const libelle = document.getElementById('dep-libelle').value.trim();
+      const resp = document.getElementById('dep-resp').value.trim();
+      if(!libelle){ showToast('Le libellé est obligatoire'); return; }
+      const maxId = depenses.reduce((a,x)=>Math.max(a,x.id),0);
+      depenses.push({id:maxId+1, libelle, avance:0, justifie:0, responsable:resp, historique:{}});
+      depAddOpen=false; saveKey('depenses', depenses, true); renderDepenses(panel);
+    };
+    panel.querySelectorAll('.dep-av').forEach(inp=>{ inp.onchange=(e)=>{ const x=depenses.find(d=>d.id===parseInt(e.target.dataset.id)); let v=parseInt(e.target.value); if(isNaN(v)||v<0)v=0; x.avance=v; saveKeyDebounced('depenses', depenses); renderDepenses(panel); }; });
+    panel.querySelectorAll('.dep-ju').forEach(inp=>{ inp.onchange=(e)=>{ const x=depenses.find(d=>d.id===parseInt(e.target.dataset.id)); let v=parseInt(e.target.value); if(isNaN(v)||v<0)v=0; x.justifie=v; saveKeyDebounced('depenses', depenses); renderDepenses(panel); }; });
+  }
+}
+
+/* ---------- Bus & Voyageurs ---------- */
+function busOccupants(busId){ return voyageurs.filter(v=>v.bus_id===busId); }
+function formatDateFr(iso){
+  if(!iso) return '';
+  const d = new Date(iso+'T00:00:00');
+  if(isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+}
+function renderBus(panel){
+  const dateLabel = busTransport.date_depart ? formatDateFr(busTransport.date_depart) : 'Date non encore fixée';
+  const atMax = buses.length >= MAX_BUSES;
+  panel.innerHTML = `
+    <div class="panel">
+      <h2>Bus & voyageurs</h2>
+      <p class="lede">${MAX_BUSES} bus au maximum, ${MAX_CAPACITE} places au maximum chacun. Tous partent ensemble du même point vers la même destination.</p>
+
+      <div class="self-lookup" style="margin-bottom:18px;">
+        <h3>Trajet</h3>
+        ${role==='comite' ? `
+        <div class="toolbar" style="margin-bottom:0;">
+          <div class="fld" style="flex:1;min-width:160px;"><label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px;">Départ</label>
+            <input type="text" id="bt-depart" value="${busTransport.depart}" style="width:100%;padding:9px 12px;border-radius:9px;border:1px solid var(--line);font-size:13px;font-family:inherit;"/></div>
+          <div class="fld" style="flex:1;min-width:160px;"><label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px;">Destination</label>
+            <input type="text" id="bt-destination" value="${busTransport.destination}" style="width:100%;padding:9px 12px;border-radius:9px;border:1px solid var(--line);font-size:13px;font-family:inherit;"/></div>
+          <div class="fld" style="flex:1;min-width:160px;"><label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px;">Date de départ</label>
+            <input type="date" id="bt-date" value="${busTransport.date_depart}" style="width:100%;padding:9px 12px;border-radius:9px;border:1px solid var(--line);font-size:13px;font-family:inherit;"/></div>
+        </div>
+        <p class="cat-badge" style="margin-top:8px;">Habituellement : départ 2 jours avant le Maouloud.</p>
+        ` : `
+        <div style="display:flex;gap:20px;flex-wrap:wrap;font-size:13.5px;">
+          <span>Départ : <b>${busTransport.depart}</b></span>
+          <span>Destination : <b>${busTransport.destination}</b></span>
+          <span>Date : <b>${dateLabel}</b></span>
+        </div>
+        `}
+      </div>
+
+      <div class="toolbar">
+        <button class="btn" id="busPrintAllBtn">🖨 Imprimer tous les bus</button>
+      </div>
+      ${role==='comite' ? (atMax
+        ? `<p class="cat-badge" style="margin-bottom:10px;">Nombre maximum de bus atteint (${buses.length}/${MAX_BUSES}).</p>`
+        : `<div class="toolbar"><button class="btn primary" id="busAddBtn">+ Ajouter un bus</button></div>
+      <div class="addform ${busAddOpen?'open':''}" id="busAddForm">
+        <input type="text" id="bus-nom" placeholder="Nom du bus (ex. Bus 5)"/>
+        <input type="number" id="bus-cap" placeholder="Capacité (max ${MAX_CAPACITE})" max="${MAX_CAPACITE}"/>
+        <button class="btn primary" id="busSaveBtn">Créer</button>
+        <button class="btn ghost" id="busCancelBtn">Annuler</button>
+      </div>`) : ''}
+      <div class="bus-grid" style="margin-top:14px;">
+        ${buses.length===0 ? `<div class="empty">Aucun bus créé pour l'instant.</div>` : buses.map(b=>renderBusCard(b)).join('')}
+      </div>
+    </div>
+  `;
+  document.getElementById('busPrintAllBtn').onclick = ()=>printAllBuses();
+  panel.querySelectorAll('.bus-print-one').forEach(btn=>{ btn.onclick = ()=>printBusManifest(parseInt(btn.dataset.busprint)); });
+  if(role==='comite'){
+    const btDepart = document.getElementById('bt-depart');
+    if(btDepart) btDepart.onchange = (e)=>{ busTransport.depart = e.target.value.trim() || 'SEFA Pikine'; saveKeyDebounced('bustransport', busTransport); renderBus(panel); };
+    const btDest = document.getElementById('bt-destination');
+    if(btDest) btDest.onchange = (e)=>{ busTransport.destination = e.target.value.trim() || 'Barobé Diackel'; saveKeyDebounced('bustransport', busTransport); renderBus(panel); };
+    const btDate = document.getElementById('bt-date');
+    if(btDate) btDate.onchange = (e)=>{ busTransport.date_depart = e.target.value; saveKeyDebounced('bustransport', busTransport); renderBus(panel); };
+    const addBtn = document.getElementById('busAddBtn');
+    if(addBtn) addBtn.onclick = ()=>{ busAddOpen=!busAddOpen; renderBus(panel); };
+    const cancel = document.getElementById('busCancelBtn'); if(cancel) cancel.onclick=()=>{ busAddOpen=false; renderBus(panel); };
+    const save = document.getElementById('busSaveBtn');
+    if(save) save.onclick = ()=>{
+      if(buses.length >= MAX_BUSES){ showToast(`Maximum ${MAX_BUSES} bus`); return; }
+      const nom = document.getElementById('bus-nom').value.trim();
+      let cap = parseInt(document.getElementById('bus-cap').value)||MAX_CAPACITE;
+      if(cap > MAX_CAPACITE){ cap = MAX_CAPACITE; showToast(`Capacité limitée à ${MAX_CAPACITE} places`); }
+      if(!nom){ showToast('Le nom du bus est obligatoire'); return; }
+      const maxId = buses.reduce((a,x)=>Math.max(a,x.id),0);
+      buses.push({id:maxId+1, nom, capacite:cap});
+      busAddOpen=false; saveKey('buses', buses, true); renderBus(panel);
+    };
+    panel.querySelectorAll('.bus-cap-input').forEach(inp=>{
+      inp.onchange = (e)=>{
+        const b = buses.find(x=>x.id===parseInt(e.target.dataset.id));
+        let v = parseInt(e.target.value);
+        if(isNaN(v) || v<0) v = 0;
+        if(v > MAX_CAPACITE){ v = MAX_CAPACITE; showToast(`Capacité limitée à ${MAX_CAPACITE} places`); }
+        b.capacite = v;
+        saveKeyDebounced('buses', buses);
+        renderBus(panel);
+      };
+    });
+  }
+  wireBusCards(panel);
+}
+function renderBusCard(b){
+  const occ = busOccupants(b.id);
+  const over = occ.length>b.capacite;
+  const pct = b.capacite>0 ? Math.min(100, Math.round((occ.length/b.capacite)*100)) : 0;
+  const vf = voyForm[b.id] || {open:false, isMember:true, memberQuery:'', memberId:null};
+  const capCell = role==='comite'
+    ? `<input type="number" class="bus-cap-input" data-id="${b.id}" value="${b.capacite}" min="0" max="${MAX_CAPACITE}" style="width:64px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:center;"/>`
+    : `${b.capacite}`;
+  return `
+    <div class="bus-card">
+      <div class="bus-card-head">
+        <div><div class="n">${b.nom}</div><div class="cat-badge">${busTransport.depart} → ${busTransport.destination}</div></div>
+        <div style="text-align:right;">
+          <div class="cap">${occ.length} / ${capCell} places</div>
+          <button class="btn sm ghost bus-print-one" data-busprint="${b.id}" style="margin-top:4px;padding:3px 8px;font-size:11px;">🖨 Imprimer</button>
+        </div>
+      </div>
+      <div class="occ-bar"><div class="occ-fill ${over?'over':''}" style="width:${pct}%"></div></div>
+      ${over ? `<div class="badge neg" style="margin-bottom:8px;">Complet — sureffectif</div>` : ''}
+      <div class="voy-list">
+        ${occ.length===0 ? `<div class="empty" style="padding:10px;">Aucun voyageur inscrit.</div>` : occ.map(v=>`
+          <div class="voy-item">
+            <span>${v.nom}</span>
+            <span style="display:flex;align-items:center;gap:6px;">
+              <span class="tag ${v.est_membre?'':'nonmember'}">${v.est_membre?'Membre':'Non-membre'}</span>
+              ${role==='comite' ? `<button class="btn danger-ghost" data-delvoy="${v.id}">×</button>` : ''}
+            </span>
+          </div>`).join('')}
+      </div>
+      ${role==='comite' ? `
+      <div style="margin-top:10px;">
+        <button class="btn sm" data-voyopen="${b.id}">${vf.open?'Fermer':'+ Ajouter un voyageur'}</button>
+        <div class="addform ${vf.open?'open':''}" style="margin-top:8px;">
+          <select data-voytype="${b.id}">
+            <option value="member" ${vf.isMember?'selected':''}>Membre de l'association</option>
+            <option value="nonmember" ${!vf.isMember?'selected':''}>Non-membre / invité</option>
+          </select>
+          ${vf.isMember
+            ? `<input type="text" data-voymember="${b.id}" placeholder="Rechercher un membre..." value="${vf.memberQuery||''}"/>`
+            : `<input type="text" data-voyname="${b.id}" placeholder="Nom du voyageur"/>`}
+          <button class="btn primary sm" data-voysave="${b.id}">Ajouter</button>
+        </div>
+        ${vf.open && vf.isMember && vf.memberQuery && vf.memberQuery.trim() ? renderVoyMemberResults(b.id, vf) : ''}
+      </div>` : ''}
+    </div>
+  `;
+}
+function renderVoyMemberResults(busId, vf){
+  const q = vf.memberQuery.trim().toLowerCase();
+  const matches = members.filter(m=>(m.prenom+' '+m.nom).toLowerCase().includes(q)).slice(0,6);
+  if(matches.length===0) return `<div class="empty" style="padding:8px;">Aucun membre trouvé.</div>`;
+  return `<div class="enc-results" style="margin-top:6px;">${matches.map(m=>`
+    <div class="enc-result" data-voypick="${busId}" data-mid="${m.id}" style="padding:8px 10px;">
+      <span class="n" style="font-size:12.5px;">${m.prenom} ${m.nom}</span>
+      ${vf.memberId===m.id ? `<span class="badge pos">Sélectionné</span>` : ''}
+    </div>`).join('')}</div>`;
+}
+function wireBusCards(panel){
+  panel.querySelectorAll('[data-voyopen]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const id = btn.dataset.voyopen;
+      voyForm[id] = voyForm[id] || {open:false, isMember:true, memberQuery:'', memberId:null};
+      voyForm[id].open = !voyForm[id].open;
+      renderBus(panel);
+    };
+  });
+  panel.querySelectorAll('[data-voytype]').forEach(sel=>{
+    sel.onchange = (e)=>{ const id=sel.dataset.voytype; voyForm[id].isMember = e.target.value==='member'; renderBus(panel); };
+  });
+  panel.querySelectorAll('[data-voymember]').forEach(inp=>{
+    inp.oninput = (e)=>{ const id=inp.dataset.voymember; voyForm[id].memberQuery = e.target.value; voyForm[id].memberId=null; renderBus(panel);
+      const el = panel.querySelector(`[data-voymember="${id}"]`); if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); } };
+  });
+  panel.querySelectorAll('[data-voypick]').forEach(el=>{
+    el.onclick = ()=>{ const id=el.dataset.voypick; voyForm[id].memberId = parseInt(el.dataset.mid); renderBus(panel); };
+  });
+  panel.querySelectorAll('[data-voysave]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const busId = parseInt(btn.dataset.voysave);
+      const vf = voyForm[busId];
+      const maxId = voyageurs.reduce((a,x)=>Math.max(a,x.id),0);
+      if(vf.isMember){
+        if(!vf.memberId){ showToast('Sélectionnez un membre dans la liste'); return; }
+        const m = members.find(x=>x.id===vf.memberId);
+        voyageurs.push({id:maxId+1, bus_id:busId, nom:`${m.prenom} ${m.nom}`, est_membre:true, membre_id:m.id, telephone:''});
+      }else{
+        const nameInput = panel.querySelector(`[data-voyname="${busId}"]`);
+        const nom = nameInput.value.trim();
+        if(!nom){ showToast('Le nom du voyageur est obligatoire'); return; }
+        voyageurs.push({id:maxId+1, bus_id:busId, nom, est_membre:false, membre_id:null, telephone:''});
+      }
+      voyForm[busId] = {open:false, isMember:true, memberQuery:'', memberId:null};
+      saveKey('voyageurs', voyageurs, true);
+      renderBus(panel);
+    };
+  });
+  panel.querySelectorAll('[data-delvoy]').forEach(btn=>{
+    btn.onclick = ()=>{ voyageurs = voyageurs.filter(v=>v.id!==parseInt(btn.dataset.delvoy)); saveKey('voyageurs', voyageurs, true); renderBus(panel); };
+  });
+}
+
+/* ---------- Comptes (admin) ---------- */
+let usersCache = [];
+let auditCache = [];
+let userAddOpen = false;
+
+async function renderComptes(panel){
+  panel.innerHTML = `<div class="panel"><h2>Comptes</h2><p class="lede">Chargement...</p></div>`;
+  const [users, audit] = await Promise.all([apiListUsers(), apiAudit()]);
+  usersCache = users; auditCache = audit;
+  renderComptesContent(panel);
+}
+function auditLabel(action){
+  const map = {login:'Connexion', logout:'Déconnexion', update:'Modification de données', create_user:'Création de compte', delete_user:'Suppression de compte', reset_password:'Réinitialisation de mot de passe'};
+  return map[action] || action;
+}
+function renderComptesContent(panel){
+  panel.innerHTML = `
+    <div class="panel">
+      <h2>Comptes</h2>
+      <p class="lede">Comptes nominatifs pour le comité et les collecteurs. Connexions et modifications sont tracées dans le journal ci-dessous.</p>
+      <div class="toolbar"><button class="btn primary" id="userAddBtn">+ Créer un compte</button></div>
+      <div class="addform ${userAddOpen?'open':''}" id="userAddForm">
+        <input type="text" id="u-username" placeholder="Identifiant (ex. fatou)"/>
+        <input type="text" id="u-display" placeholder="Nom affiché (ex. Fatou DIOP)"/>
+        <input type="password" id="u-password" placeholder="Mot de passe (4+ caractères)"/>
+        <select id="u-role"><option value="collecteur">Collecteur</option><option value="admin">Administrateur</option></select>
+        <button class="btn primary" id="userSaveBtn">Créer</button>
+        <button class="btn ghost" id="userCancelBtn">Annuler</button>
+      </div>
+      <div class="mlist" style="margin-top:14px;">
+        ${usersCache.map((u,i)=>`
+        <div class="mrow" style="grid-template-columns:28px 1.4fr 1fr 1fr 140px;">
+          <div class="idx num">${i+1}</div>
+          <div class="name">${u.display_name}<div class="cat-badge">@${u.username}</div></div>
+          <div class="field"><div class="l">Rôle</div><div class="v">${u.role==='admin'?'Administrateur':'Collecteur'}</div></div>
+          <div class="field"><div class="l">Créé le</div><div class="v" style="font-size:11.5px;">${u.created_at.slice(0,10)}</div></div>
+          <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center;">
+            <button class="btn sm ghost" data-resetpw="${u.username}" title="Réinitialiser le mot de passe">Mot de passe</button>
+            ${u.username!==currentUser.username ? `<button class="btn danger-ghost" data-deluser="${u.username}">Suppr.</button>` : ''}
+          </div>
+        </div>`).join('')}
+      </div>
+
+      <div class="section-gap">
+        <h3 style="font-family:'Fraunces',serif;font-size:16px;color:var(--primary-dark);margin:0 0 10px;">Journal d'activité</h3>
+        <div class="mlist">
+          ${auditCache.length===0 ? `<div class="empty">Aucune activité enregistrée.</div>` : auditCache.slice(0,50).map(a=>`
+          <div class="log-item"><span><b>${a.username}</b> — ${auditLabel(a.action)}${a.target?(' · '+a.target):''}</span><span class="t">${a.at.replace('T',' ').slice(0,16)}</span></div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('userAddBtn').onclick = ()=>{ userAddOpen=!userAddOpen; renderComptesContent(panel); };
+  const cancel = document.getElementById('userCancelBtn'); if(cancel) cancel.onclick = ()=>{ userAddOpen=false; renderComptesContent(panel); };
+  const save = document.getElementById('userSaveBtn');
+  if(save) save.onclick = async ()=>{
+    const username = document.getElementById('u-username').value.trim();
+    const display_name = document.getElementById('u-display').value.trim();
+    const password = document.getElementById('u-password').value;
+    const roleSel = document.getElementById('u-role').value;
+    if(!username || !password){ showToast('Identifiant et mot de passe requis'); return; }
+    const res = await apiCreateUser({username, display_name, password, role:roleSel});
+    if(!res.ok){ showToast(res.error); return; }
+    showToast('Compte créé');
+    userAddOpen=false;
+    usersCache = await apiListUsers();
+    renderComptesContent(panel);
+  };
+  panel.querySelectorAll('[data-deluser]').forEach(b=>{
+    b.onclick = async ()=>{
+      if(!confirm('Supprimer ce compte ?')) return;
+      const res = await apiDeleteUser(b.dataset.deluser);
+      if(!res.ok){ showToast(res.error); return; }
+      usersCache = await apiListUsers();
+      renderComptesContent(panel);
+    };
+  });
+  panel.querySelectorAll('[data-resetpw]').forEach(b=>{
+    b.onclick = async ()=>{
+      const pw = prompt('Nouveau mot de passe pour '+b.dataset.resetpw+' :');
+      if(!pw) return;
+      const res = await apiResetPassword(b.dataset.resetpw, pw);
+      if(!res.ok){ showToast(res.error); return; }
+      showToast('Mot de passe réinitialisé');
+    };
+  });
+}
+
+(async function init(){
+  const me = await apiMe();
+  if(me.role === 'comite'){
+    currentUser = {username: me.username, display_name: me.display_name, is_admin: me.is_admin};
+    role = 'comite';
+  }
+  await loadAll();
+  render();
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
+  }
+})();
+</script>
+</body>
+</html>

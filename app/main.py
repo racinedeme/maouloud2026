@@ -1,0 +1,377 @@
+"""
+Maouloud 2026 — backend de l'application de gestion de l'association.
+
+Stocke chaque module (cotisations, dépenses, bonnes volontés, bus...) comme un
+document JSON dans une base SQLite locale. Chaque collecteur dispose d'un
+compte nominatif (nom d'utilisateur + mot de passe) ; toute modification est
+tracée dans un journal d'activité consultable par les administrateurs.
+
+Rôles :
+  - "admin"      : accès complet + gestion des comptes + journal d'activité
+  - "collecteur" : accès complet à la saisie (cotisations, dépenses...) mais
+                    ne peut pas gérer les comptes
+  - non connecté : consultation seule (rôle "membre" côté frontend)
+"""
+import hashlib
+import hmac
+import json
+import os
+import secrets
+import sqlite3
+import time
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+BASE_DIR = Path(__file__).resolve().parent
+DB_PATH = os.environ.get("DB_PATH", str(BASE_DIR / "data.db"))
+SEED_PATH = BASE_DIR / "seed_data.json"
+
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "changez-ce-mot-de-passe")
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() == "true"
+SESSION_HOURS = float(os.environ.get("SESSION_HOURS", "12"))
+
+STORAGE_KEYS = {
+    "members": "maouloud2026-members",
+    "mobilemoney": "maouloud2026-mobilemoney",
+    "bonnesvolontes": "maouloud2026-bonnesvolontes",
+    "donsnature": "maouloud2026-donsnature",
+    "depenses": "maouloud2026-depenses",
+    "buses": "maouloud2026-buses",
+    "voyageurs": "maouloud2026-voyageurs",
+    "synthese": "maouloud2026-synthese",
+    "bustransport": "maouloud2026-bustransport",
+}
+
+# ---------------------------------------------------------------------------
+# Storage
+# ---------------------------------------------------------------------------
+
+@contextmanager
+def db():
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def init_db():
+    with db() as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS users ("
+            " username TEXT PRIMARY KEY,"
+            " password_hash TEXT NOT NULL,"
+            " salt TEXT NOT NULL,"
+            " display_name TEXT NOT NULL,"
+            " role TEXT NOT NULL,"
+            " created_at TEXT NOT NULL"
+            ")"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS audit_log ("
+            " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " username TEXT NOT NULL,"
+            " action TEXT NOT NULL,"
+            " target TEXT,"
+            " at TEXT NOT NULL"
+            ")"
+        )
+
+        existing = {row[0] for row in conn.execute("SELECT key FROM kv")}
+        if not existing and SEED_PATH.exists():
+            seeds = json.loads(SEED_PATH.read_text(encoding="utf-8"))
+            for name, storage_key in STORAGE_KEYS.items():
+                value = seeds.get(name)
+                if value is not None:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO kv (key, value) VALUES (?, ?)",
+                        (storage_key, json.dumps(value, ensure_ascii=False)),
+                    )
+
+        has_admin = conn.execute(
+            "SELECT 1 FROM users WHERE role='admin' LIMIT 1"
+        ).fetchone()
+        if not has_admin:
+            h, salt = hash_password(ADMIN_PASSWORD)
+            conn.execute(
+                "INSERT OR REPLACE INTO users (username, password_hash, salt, display_name, role, created_at)"
+                " VALUES (?,?,?,?,?,?)",
+                (ADMIN_USERNAME, h, salt, "Administrateur", "admin", now_iso()),
+            )
+
+
+def kv_get(key: str):
+    with db() as conn:
+        row = conn.execute("SELECT value FROM kv WHERE key=?", (key,)).fetchone()
+        return row[0] if row else None
+
+
+def kv_set(key: str, value: str):
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO kv (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (key, value),
+        )
+
+
+def log_action(username: str, action: str, target: str | None = None):
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO audit_log (username, action, target, at) VALUES (?,?,?,?)",
+            (username, action, target, now_iso()),
+        )
+
+
+# ---------------------------------------------------------------------------
+# Passwords
+# ---------------------------------------------------------------------------
+
+def hash_password(password: str, salt: str | None = None):
+    salt = salt or secrets.token_hex(16)
+    h = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), 100_000)
+    return h.hex(), salt
+
+
+def verify_password(password: str, salt: str, expected_hash: str) -> bool:
+    h, _ = hash_password(password, salt)
+    return hmac.compare_digest(h, expected_hash)
+
+
+def get_user(username: str):
+    with db() as conn:
+        row = conn.execute(
+            "SELECT username, password_hash, salt, display_name, role FROM users WHERE username=?",
+            (username,),
+        ).fetchone()
+        if not row:
+            return None
+        return {"username": row[0], "password_hash": row[1], "salt": row[2], "display_name": row[3], "role": row[4]}
+
+
+# ---------------------------------------------------------------------------
+# Sessions
+# ---------------------------------------------------------------------------
+
+sessions: dict[str, dict] = {}  # token -> {username, role, display_name, expiry}
+
+
+def create_session(user: dict) -> str:
+    token = secrets.token_urlsafe(32)
+    sessions[token] = {
+        "username": user["username"],
+        "role": user["role"],
+        "display_name": user["display_name"],
+        "expiry": time.time() + SESSION_HOURS * 3600,
+    }
+    return token
+
+
+def current_session(request: Request):
+    token = request.cookies.get("session")
+    s = sessions.get(token) if token else None
+    if not s:
+        return None
+    if s["expiry"] < time.time():
+        del sessions[token]
+        return None
+    return s
+
+
+def require_writer(request: Request) -> dict:
+    """Admin or collecteur — anyone with a valid account can write."""
+    s = current_session(request)
+    if not s:
+        raise HTTPException(status_code=401, detail="Connexion requise")
+    return s
+
+
+def require_admin(request: Request) -> dict:
+    s = current_session(request)
+    if not s or s["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Réservé aux administrateurs")
+    return s
+
+
+# ---------------------------------------------------------------------------
+# App
+# ---------------------------------------------------------------------------
+
+app = FastAPI(title="Maouloud 2026 API")
+
+
+class LoginBody(BaseModel):
+    username: str
+    password: str
+
+
+class StoreBody(BaseModel):
+    value: str
+
+
+class CreateUserBody(BaseModel):
+    username: str
+    password: str
+    display_name: str
+    role: str  # 'admin' | 'collecteur'
+
+
+class ResetPasswordBody(BaseModel):
+    password: str
+
+
+@app.on_event("startup")
+def _startup():
+    init_db()
+
+
+@app.post("/api/login")
+def login(body: LoginBody, response: Response):
+    user = get_user(body.username.strip())
+    if not user or not verify_password(body.password, user["salt"], user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Identifiants incorrects")
+    token = create_session(user)
+    response.set_cookie(
+        "session", token,
+        httponly=True, secure=COOKIE_SECURE, samesite="lax",
+        max_age=int(SESSION_HOURS * 3600),
+    )
+    log_action(user["username"], "login")
+    return {"ok": True, "username": user["username"], "display_name": user["display_name"], "role": user["role"]}
+
+
+@app.post("/api/logout")
+def logout(request: Request, response: Response):
+    s = current_session(request)
+    token = request.cookies.get("session")
+    if token in sessions:
+        del sessions[token]
+    if s:
+        log_action(s["username"], "logout")
+    response.delete_cookie("session")
+    return {"ok": True}
+
+
+@app.get("/api/me")
+def me(request: Request):
+    s = current_session(request)
+    if not s:
+        return {"role": "membre"}
+    return {
+        "role": "comite",
+        "username": s["username"],
+        "display_name": s["display_name"],
+        "is_admin": s["role"] == "admin",
+    }
+
+
+@app.get("/api/store/{key}")
+def get_store(key: str):
+    value = kv_get(key)
+    if value is None:
+        raise HTTPException(status_code=404, detail="Clé introuvable")
+    return {"key": key, "value": value}
+
+
+@app.put("/api/store/{key}")
+def put_store(key: str, body: StoreBody, request: Request):
+    s = require_writer(request)
+    kv_set(key, body.value)
+    log_action(s["username"], "update", key)
+    return {"key": key, "ok": True}
+
+
+@app.get("/api/users")
+def list_users(request: Request):
+    require_admin(request)
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT username, display_name, role, created_at FROM users ORDER BY created_at"
+        ).fetchall()
+    return [
+        {"username": r[0], "display_name": r[1], "role": r[2], "created_at": r[3]}
+        for r in rows
+    ]
+
+
+@app.post("/api/users")
+def create_user(body: CreateUserBody, request: Request):
+    s = require_admin(request)
+    username = body.username.strip().lower()
+    if not username or not body.password or len(body.password) < 4:
+        raise HTTPException(status_code=400, detail="Nom d'utilisateur et mot de passe (4+ caractères) requis")
+    if body.role not in ("admin", "collecteur"):
+        raise HTTPException(status_code=400, detail="Rôle invalide")
+    if get_user(username):
+        raise HTTPException(status_code=409, detail="Ce nom d'utilisateur existe déjà")
+    h, salt = hash_password(body.password)
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO users (username, password_hash, salt, display_name, role, created_at) VALUES (?,?,?,?,?,?)",
+            (username, h, salt, body.display_name.strip() or username, body.role, now_iso()),
+        )
+    log_action(s["username"], "create_user", username)
+    return {"ok": True}
+
+
+@app.delete("/api/users/{username}")
+def delete_user(username: str, request: Request):
+    s = require_admin(request)
+    username = username.strip().lower()
+    if username == s["username"]:
+        raise HTTPException(status_code=400, detail="Vous ne pouvez pas supprimer votre propre compte")
+    with db() as conn:
+        admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE role='admin'").fetchone()[0]
+        target = conn.execute("SELECT role FROM users WHERE username=?", (username,)).fetchone()
+        if not target:
+            raise HTTPException(status_code=404, detail="Compte introuvable")
+        if target[0] == "admin" and admin_count <= 1:
+            raise HTTPException(status_code=400, detail="Impossible de supprimer le dernier administrateur")
+        conn.execute("DELETE FROM users WHERE username=?", (username,))
+    log_action(s["username"], "delete_user", username)
+    return {"ok": True}
+
+
+@app.put("/api/users/{username}/password")
+def reset_password(username: str, body: ResetPasswordBody, request: Request):
+    s = require_admin(request)
+    username = username.strip().lower()
+    if not get_user(username):
+        raise HTTPException(status_code=404, detail="Compte introuvable")
+    if len(body.password) < 4:
+        raise HTTPException(status_code=400, detail="Mot de passe trop court (4+ caractères)")
+    h, salt = hash_password(body.password)
+    with db() as conn:
+        conn.execute("UPDATE users SET password_hash=?, salt=? WHERE username=?", (h, salt, username))
+    log_action(s["username"], "reset_password", username)
+    return {"ok": True}
+
+
+@app.get("/api/audit")
+def get_audit(request: Request):
+    require_admin(request)
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT username, action, target, at FROM audit_log ORDER BY id DESC LIMIT 300"
+        ).fetchall()
+    return [{"username": r[0], "action": r[1], "target": r[2], "at": r[3]} for r in rows]
+
+
+# Serve the frontend. Declared last so /api/* routes above take priority.
+static_dir = BASE_DIR.parent / "static"
+if static_dir.exists():
+    app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
