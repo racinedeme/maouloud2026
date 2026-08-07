@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --paper:#FBF8F1; --paper-raised:#FFFFFF; --ink:#22302B; --ink-soft:#5B6D63;
@@ -207,6 +208,7 @@ const SEED_DEPENSES = [{"id":1,"libelle":"Commande de Bœufs","avance":1000000,"
 const SEED_BONNESVOLONTES = [{"id":1,"nom":"Gambie","montant":0,"ziar":0,"observation":""},{"id":2,"nom":"Ousmane Yaya DEME","montant":0,"ziar":0,"observation":""},{"id":3,"nom":"Ibou BARRO","montant":0,"ziar":0,"observation":""},{"id":4,"nom":"Daouda BARRO","montant":0,"ziar":0,"observation":""},{"id":5,"nom":"Hamet BARRO","montant":0,"ziar":0,"observation":""},{"id":6,"nom":"Seynabou BARRO","montant":0,"ziar":0,"observation":""},{"id":7,"nom":"Amy SEYE","montant":0,"ziar":0,"observation":""},{"id":8,"nom":"Ablaye GALO Hann","montant":0,"ziar":0,"observation":""},{"id":9,"nom":"Moussa GALO","montant":0,"ziar":0,"observation":""},{"id":10,"nom":"Congo","montant":0,"ziar":0,"observation":""},{"id":11,"nom":"Féddé le 06","montant":0,"ziar":0,"observation":""},{"id":12,"nom":"Cote d'ivoire","montant":0,"ziar":0,"observation":""},{"id":13,"nom":"Amadou Hamet Mbourré","montant":0,"ziar":0,"observation":""},{"id":14,"nom":"Thierno Moussa DIA","montant":0,"ziar":0,"observation":""},{"id":15,"nom":"Fati mamadou Amadou Kebe","montant":0,"ziar":0,"observation":""},{"id":16,"nom":"Kardiata Amadou SALL","montant":0,"ziar":0,"observation":""},{"id":17,"nom":"Penda BARRO","montant":0,"ziar":0,"observation":""},{"id":18,"nom":"Amnata Thierno Hamet BARRO","montant":0,"ziar":0,"observation":""},{"id":19,"nom":"Rassidou Sarrata","montant":0,"ziar":0,"observation":""},{"id":20,"nom":"Samba SELLY","montant":0,"ziar":0,"observation":""},{"id":21,"nom":"Kardiatou Abdoulaye Yaya DEME","montant":0,"ziar":0,"observation":""},{"id":22,"nom":"Caisse Mouyabé et Ndiabaldii","montant":0,"ziar":0,"observation":""},{"id":23,"nom":"Asmawou Thierno Hemth","montant":0,"ziar":0,"observation":""},{"id":24,"nom":"Cherif GASSAMA","montant":0,"ziar":0,"observation":""},{"id":25,"nom":"Divers","montant":0,"ziar":0,"observation":""}];
 const SEED_DONSNATURE = [{"id":1,"donateur":"AMADOU LAMINE KEBE","article":"NESCAFE"},{"id":2,"donateur":"TIDIANE CIRE","article":"LALO + SEL"},{"id":3,"donateur":"RACINE DEME","article":"THE"},{"id":4,"donateur":"HASSIMIOU ABDOULAYE","article":"MOUTARDE"},{"id":5,"donateur":"ADAMA BARRO","article":"POIVRE"},{"id":6,"donateur":"YOUNOUSS KALIDOU DIALLO","article":"COLA"},{"id":7,"donateur":"ABOU ABDOULAYE","article":"CUBE MAGGI"},{"id":8,"donateur":"MAMADOU ABDOULAYE DIAM KEBE","article":"VINAIGRE"},{"id":9,"donateur":"ALPHA SAMBA ALAPHA","article":"OMO"},{"id":10,"donateur":"OUMAR MAMADOU DEME","article":"AIL"},{"id":11,"donateur":"OUMAR DEMBA ASTEL","article":"BONBON MENTH"}];
 const SEED_MOBILEMONEY = [{"id":1,"nom":"SAMBA DIA","operateur":"WAVE","montant":100000}];
+const SEED_ZIAR = [];
 const SEED_SYNTHESE = {"report_caisse":1663650};
 const SEED_BUSES = [{"id":1,"nom":"Bus 1","capacite":70},{"id":2,"nom":"Bus 2","capacite":70},{"id":3,"nom":"Bus 3","capacite":70},{"id":4,"nom":"Bus 4","capacite":70}];
 const SEED_BUSTRANSPORT = {"destination":"Barobé Diackel","depart":"SEFA Pikine","date_depart":"2026-08-23","note":"Départ prévu 2 jours avant le Maouloud"};
@@ -219,10 +221,10 @@ const STORAGE_KEYS = {
   bonnesvolontes:'maouloud2026-bonnesvolontes', donsnature:'maouloud2026-donsnature',
   depenses:'maouloud2026-depenses', buses:'maouloud2026-buses',
   voyageurs:'maouloud2026-voyageurs', synthese:'maouloud2026-synthese',
-  bustransport:'maouloud2026-bustransport'
+  bustransport:'maouloud2026-bustransport', ziar:'maouloud2026-ziar'
 };
 
-let members=[], mobilemoney=[], bonnesvolontes=[], donsnature=[], depenses=[], buses=[], voyageurs=[];
+let members=[], mobilemoney=[], bonnesvolontes=[], donsnature=[], depenses=[], buses=[], voyageurs=[], ziar=[];
 let synthese = {report_caisse:0};
 let busTransport = {destination:'Barobé Diackel', date_depart:'', note:''};
 
@@ -232,12 +234,67 @@ let catTab = 'overview';
 let searchQuery = '', statusFilter = 'all', sortByReste = false, addFormOpen = false;
 let encQuery = '', encSelectedId = null;
 let sessionLog = [];
-let mmAddOpen = false, bvAddOpen = false, dnAddOpen = false, depAddOpen = false, busAddOpen = false;
+let mmAddOpen = false, bvAddOpen = false, dnAddOpen = false, depAddOpen = false, busAddOpen = false, ziarAddOpen = false;
 let voyForm = {}; // {busId: {open, isMember, memberQuery, memberId}}
 let dashLookupQuery = '';
 
+/* ---------- Mode "poste dédié" (assemblée générale) ----------
+   Ouvrir l'app avec ?tab=encaissement / ?tab=bus / ?tab=bonnesvolontes / ?tab=dashboard
+   et &kiosk=1 pour verrouiller le poste sur ce seul module (utile pour les
+   ordinateurs dédiés le jour de l'assemblée générale). */
+const urlParams = new URLSearchParams(location.search);
+const desiredKioskTab = urlParams.get('tab');
+const kioskMode = urlParams.get('kiosk') === '1';
+if(desiredKioskTab) mainTab = desiredKioskTab;
+
 function fmt(n){ return (n||0).toLocaleString('fr-FR'); }
 function statusOf(m){ if(m.montant_verse<=0) return 'unpaid'; if(m.montant_verse>=m.montant_attendu) return 'paid'; return 'partial'; }
+
+/* ---------- Export Excel ---------- */
+function exportExcel(filename, sheetsDef){
+  try{
+    const wb = XLSX.utils.book_new();
+    sheetsDef.forEach(sd=>{
+      const data = [sd.headers, ...sd.rows];
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      XLSX.utils.book_append_sheet(wb, ws, sd.name.slice(0,31));
+    });
+    XLSX.writeFile(wb, filename);
+    showToast('Export Excel généré');
+  }catch(e){ showToast("Erreur lors de l'export Excel"); }
+}
+function exportCotisationsExcel(){
+  const rows = members.map(m=>{
+    const cat = CATEGORIES.find(c=>c.key===m.categorie);
+    return [cat?cat.label:m.categorie, m.prenom, m.nom||'', m.montant_attendu, m.montant_verse, Math.max(m.montant_attendu-m.montant_verse,0), statusOf(m)==='paid'?'Payé':statusOf(m)==='partial'?'Partiel':'Non payé'];
+  });
+  exportExcel('maouloud2026-cotisations.xlsx', [{name:'Cotisations', headers:['Catégorie','Prénom','Nom','Attendu','Versé','Reste','Statut'], rows}]);
+}
+function exportMobileMoneyExcel(){
+  const rows = mobilemoney.map(x=>[x.nom, x.operateur, x.montant]);
+  exportExcel('maouloud2026-mobile-money.xlsx', [{name:'Mobile Money', headers:['Nom','Opérateur','Montant'], rows}]);
+}
+function exportBonnesVolontesExcel(){
+  const rows = bonnesvolontes.map(x=>[x.nom, x.montant, x.observation||'']);
+  const dnRows = donsnature.map(x=>[x.donateur, x.article]);
+  exportExcel('maouloud2026-bonnes-volontes.xlsx', [
+    {name:'Bonnes volontés', headers:['Nom','Montant','Observation'], rows},
+    {name:'Dons en nature', headers:['Donateur','Article'], rows:dnRows},
+  ]);
+}
+function exportZiarExcel(){
+  const rows = ziar.map(x=>[x.nom, x.montant, x.observation||'']);
+  exportExcel('maouloud2026-ziar.xlsx', [{name:'Ziar', headers:['Nom','Montant','Observation'], rows}]);
+}
+function exportDepensesExcel(){
+  const rows = depenses.map(x=>[x.libelle, x.responsable||'', x.avance, x.justifie, x.avance-x.justifie]);
+  exportExcel('maouloud2026-depenses.xlsx', [{name:'Dépenses', headers:['Libellé','Responsable','Avancé','Justifié','Reliquat'], rows}]);
+}
+function exportBusExcel(){
+  const rows = [];
+  buses.forEach(b=>{ busOccupants(b.id).forEach(v=>{ rows.push([b.nom, v.nom, v.est_membre?'Membre':'Non-membre']); }); });
+  exportExcel('maouloud2026-bus-voyageurs.xlsx', [{name:'Voyageurs', headers:['Bus','Nom','Statut'], rows}]);
+}
 
 /* ---------- Printing ---------- */
 function doPrint(html){
@@ -280,15 +337,53 @@ function printDepensesReport(){
   doPrint(html);
 }
 function printBonnesVolontesReport(){
-  const rows = bonnesvolontes.map((x,i)=>`<tr><td>${i+1}</td><td>${x.nom}</td><td style="text-align:right;">${fmt(x.montant)}</td><td style="text-align:right;">${fmt(x.ziar)}</td></tr>`).join('');
+  const rows = bonnesvolontes.map((x,i)=>`<tr><td>${i+1}</td><td>${x.nom}</td><td style="text-align:right;">${fmt(x.montant)}</td><td>${x.observation||''}</td></tr>`).join('');
   const dnRows = donsnature.map((x,i)=>`<tr><td>${i+1}</td><td>${x.donateur}</td><td>${x.article}</td></tr>`).join('');
   const html = printHeader('État des bonnes volontés') + `
-    <table class="print-table"><thead><tr><th>#</th><th>Nom</th><th>Montant</th><th>Ziar</th></tr></thead>
+    <table class="print-table"><thead><tr><th>#</th><th>Nom</th><th>Montant</th><th>Observation</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="4">Aucun contributeur enregistré.</td></tr>'}</tbody>
-    <tfoot><tr><td style="text-align:right;" colspan="2"><b>Total</b></td><td style="text-align:right;"><b>${fmt(bonnesvolontes.reduce((a,x)=>a+x.montant,0))}</b></td><td style="text-align:right;"><b>${fmt(bonnesvolontes.reduce((a,x)=>a+x.ziar,0))}</b></td></tr></tfoot></table>
+    <tfoot><tr><td style="text-align:right;" colspan="2"><b>Total</b></td><td style="text-align:right;"><b>${fmt(bonnesvolontes.reduce((a,x)=>a+x.montant,0))}</b></td><td></td></tr></tfoot></table>
     <h1 style="font-family:Georgia,serif;font-size:15px;margin:16px 0 8px;">Dons en nature</h1>
     <table class="print-table"><thead><tr><th>#</th><th>Donateur</th><th>Article</th></tr></thead>
     <tbody>${dnRows || '<tr><td colspan="3">Aucun don en nature.</td></tr>'}</tbody></table>
+  `;
+  doPrint(html);
+}
+function printZiarReport(){
+  const rows = ziar.map((x,i)=>`<tr><td>${i+1}</td><td>${x.nom}</td><td style="text-align:right;">${fmt(x.montant)}</td><td>${x.observation||''}</td></tr>`).join('');
+  const html = printHeader('État du Ziar') + `
+    <table class="print-table"><thead><tr><th>#</th><th>Nom</th><th>Montant</th><th>Observation</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="4">Aucune contribution Ziar enregistrée.</td></tr>'}</tbody>
+    <tfoot><tr><td style="text-align:right;" colspan="2"><b>Total</b></td><td style="text-align:right;"><b>${fmt(ziarTotal())}</b></td><td></td></tr></tfoot></table>
+  `;
+  doPrint(html);
+}
+function printMobileMoneyReport(){
+  const rows = mobilemoney.map((x,i)=>`<tr><td>${i+1}</td><td>${x.nom}</td><td>${x.operateur}</td><td style="text-align:right;">${fmt(x.montant)}</td></tr>`).join('');
+  const html = printHeader('État Wave / Orange Money') + `
+    <table class="print-table"><thead><tr><th>#</th><th>Nom</th><th>Opérateur</th><th>Montant</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="4">Aucun versement enregistré.</td></tr>'}</tbody>
+    <tfoot><tr><td style="text-align:right;" colspan="3"><b>Total</b></td><td style="text-align:right;"><b>${fmt(mmTotal())}</b></td></tr></tfoot></table>
+  `;
+  doPrint(html);
+}
+function printCotisationsReport(){
+  let rows = '';
+  CATEGORIES.forEach(c=>{
+    const list = members.filter(m=>m.categorie===c.key);
+    if(list.length===0) return;
+    rows += `<tr><td colspan="5" style="background:#F3F0E8;font-weight:700;">${c.label} — ${fmt(c.base)} FCFA</td></tr>`;
+    list.forEach((m,i)=>{
+      const reste = Math.max(m.montant_attendu-m.montant_verse,0);
+      const st = statusOf(m)==='paid'?'Payé':statusOf(m)==='partial'?'Partiel':'Non payé';
+      rows += `<tr><td>${i+1}</td><td>${m.prenom} ${m.nom||''}</td><td style="text-align:right;">${fmt(m.montant_attendu)}</td><td style="text-align:right;">${fmt(m.montant_verse)}</td><td>${st}</td></tr>`;
+    });
+  });
+  const gs = globalCotisStats();
+  const html = printHeader('État des cotisations') + `
+    <div class="meta">${gs.count} membres · Total attendu ${fmt(gs.attendu)} FCFA · Total collecté ${fmt(gs.verse)} FCFA · Taux ${gs.rate}%</div>
+    <table class="print-table" style="margin-top:10px;"><thead><tr><th>#</th><th>Nom</th><th>Attendu</th><th>Versé</th><th>Statut</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="5">Aucun membre enregistré.</td></tr>'}</tbody></table>
   `;
   doPrint(html);
 }
@@ -380,7 +475,7 @@ function saveKeyDebounced(name, value){
 }
 
 async function loadAll(){
-  [members, mobilemoney, bonnesvolontes, donsnature, depenses, buses, voyageurs, synthese, busTransport] = await Promise.all([
+  [members, mobilemoney, bonnesvolontes, donsnature, depenses, buses, voyageurs, synthese, busTransport, ziar] = await Promise.all([
     loadKey('members', SEED_MEMBERS),
     loadKey('mobilemoney', SEED_MOBILEMONEY),
     loadKey('bonnesvolontes', SEED_BONNESVOLONTES),
@@ -390,6 +485,7 @@ async function loadAll(){
     loadKey('voyageurs', SEED_VOYAGEURS),
     loadKey('synthese', SEED_SYNTHESE),
     loadKey('bustransport', SEED_BUSTRANSPORT),
+    loadKey('ziar', SEED_ZIAR),
   ]);
 }
 
@@ -412,18 +508,19 @@ function catStats(catKey){
   return {attendu, verse, count:list.length, rate};
 }
 function mmTotal(){ return mobilemoney.reduce((a,x)=>a+x.montant,0); }
-function bvTotal(){ return bonnesvolontes.reduce((a,x)=>a+x.montant+x.ziar,0); }
+function bvTotal(){ return bonnesvolontes.reduce((a,x)=>a+x.montant,0); }
+function ziarTotal(){ return ziar.reduce((a,x)=>a+x.montant,0); }
 function depTotal(){ return depenses.reduce((a,x)=>a+x.avance,0); }
 function depJustifieTotal(){ return depenses.reduce((a,x)=>a+x.justifie,0); }
 
 function synthLines(){
   const gs = globalCotisStats();
   const totalCotis = gs.verse + mmTotal();
-  const totalCotisBV = totalCotis + bvTotal();
+  const totalCotisBV = totalCotis + bvTotal() + ziarTotal();
   const totalCaisse = (synthese.report_caisse||0) + totalCotisBV;
   const totalDep = depTotal();
   const solde = totalCaisse - totalDep;
-  return {gs, totalCotis, bv:bvTotal(), totalCotisBV, totalCaisse, totalDep, solde};
+  return {gs, totalCotis, bv:bvTotal(), ziar:ziarTotal(), totalCotisBV, totalCaisse, totalDep, solde};
 }
 
 /* ---------- Shell ---------- */
@@ -433,6 +530,7 @@ const MAIN_TABS = [
   {key:'cotisations', label:'Cotisations', roles:['comite','membre']},
   {key:'mobilemoney', label:'Wave / Orange Money', roles:['comite','membre']},
   {key:'bonnesvolontes', label:'Bonnes volontés', roles:['comite','membre']},
+  {key:'ziar', label:'Ziar', roles:['comite','membre']},
   {key:'depenses', label:'Dépenses', roles:['comite','membre']},
   {key:'bus', label:'Bus & voyageurs', roles:['comite','membre']},
   {key:'comptes', label:'Comptes', roles:['comite'], adminOnly:true},
@@ -443,14 +541,20 @@ function render(){
   const gs = globalCotisStats();
   const isAdmin = !!(currentUser && currentUser.is_admin);
   const visibleTabs = MAIN_TABS.filter(t=>t.roles.includes(role) && (!t.adminOnly || isAdmin));
-  if(!visibleTabs.find(t=>t.key===mainTab)) mainTab = 'dashboard';
+  const tabDef = MAIN_TABS.find(t=>t.key===mainTab);
+  if(!tabDef){
+    mainTab = kioskMode && desiredKioskTab ? desiredKioskTab : 'dashboard';
+  }else if(!kioskMode && !visibleTabs.find(t=>t.key===mainTab)){
+    mainTab = 'dashboard';
+  }
+  const activeTabDef = MAIN_TABS.find(t=>t.key===mainTab) || MAIN_TABS[0];
 
   app.innerHTML = `
     <div class="masthead">
       <div>
-        <div class="eyebrow">Maouloud 2026</div>
-        <h1>Gestion de l'association</h1>
-        <p class="sub">${gs.count} membres · ${buses.length} bus · ${currentUser ? ('Connecté : '+currentUser.display_name+(isAdmin?' (admin)':'')) : 'Consultation publique'}</p>
+        <div class="eyebrow">Maouloud 2026${kioskMode ? ' · Poste dédié' : ''}</div>
+        <h1>${kioskMode ? activeTabDef.label : "Gestion de l'association"}</h1>
+        <p class="sub">${gs.count} membres · ${buses.length} bus · ${currentUser ? ('Connecté : '+currentUser.display_name+(currentUser.account_role==='admin'?' (admin)':currentUser.account_role==='consultation'?' (consultation)':'')) : 'Consultation publique'}</p>
       </div>
       <div class="role-toggle" style="align-items:center;gap:4px;">
         ${currentUser
@@ -469,8 +573,12 @@ function render(){
   `;
 
   const nav = document.getElementById('mainnav');
-  nav.innerHTML = visibleTabs.map(t=>`<div class="navbtn ${mainTab===t.key?'active':''}" data-tab="${t.key}">${t.label}</div>`).join('');
-  nav.querySelectorAll('.navbtn').forEach(el=>{ el.onclick = ()=>{ mainTab = el.dataset.tab; encSelectedId=null; render(); }; });
+  if(kioskMode){
+    nav.innerHTML = `<div class="navbtn active" style="cursor:default;">${activeTabDef.label}</div>`;
+  }else{
+    nav.innerHTML = visibleTabs.map(t=>`<div class="navbtn ${mainTab===t.key?'active':''}" data-tab="${t.key}">${t.label}</div>`).join('');
+    nav.querySelectorAll('.navbtn').forEach(el=>{ el.onclick = ()=>{ mainTab = el.dataset.tab; encSelectedId=null; render(); }; });
+  }
 
   const loginToggleBtn = document.getElementById('loginToggleBtn');
   if(loginToggleBtn) loginToggleBtn.onclick = ()=>{ loginFormOpen = !loginFormOpen; render(); };
@@ -481,23 +589,35 @@ function render(){
     if(!username || !password){ showToast('Nom d\'utilisateur et mot de passe requis'); return; }
     const res = await apiLogin(username, password);
     if(!res){ showToast('Identifiants incorrects'); return; }
-    currentUser = {username: res.username, display_name: res.display_name, is_admin: res.role==='admin'};
-    role = 'comite'; loginFormOpen = false;
+    currentUser = {username: res.username, display_name: res.display_name, is_admin: res.role==='admin', account_role: res.role};
+    role = (res.role==='admin' || res.role==='collecteur') ? 'comite' : 'membre';
+    loginFormOpen = false;
     render();
   };
   const logoutBtn = document.getElementById('logoutBtn');
   if(logoutBtn) logoutBtn.onclick = async ()=>{
     await apiLogout();
-    currentUser = null; role = 'membre'; mainTab = 'dashboard';
+    currentUser = null; role = 'membre';
+    if(!kioskMode) mainTab = 'dashboard';
     render();
   };
 
   const panel = document.getElementById('panel');
+  const requiresLogin = activeTabDef.roles.includes('comite') && !activeTabDef.roles.includes('membre');
+  if(requiresLogin && role!=='comite'){
+    panel.innerHTML = `<div class="panel"><h2>${activeTabDef.label}</h2><p class="lede">Connectez-vous avec un compte collecteur pour accéder à ce poste.</p></div>`;
+    return;
+  }
+  if(activeTabDef.adminOnly && !isAdmin){
+    panel.innerHTML = `<div class="panel"><h2>${activeTabDef.label}</h2><p class="lede">Accès réservé aux administrateurs.</p></div>`;
+    return;
+  }
   if(mainTab==='dashboard') renderDashboard(panel);
   else if(mainTab==='encaissement') renderEncaissement(panel);
   else if(mainTab==='cotisations') renderCotisationsModule(panel);
   else if(mainTab==='mobilemoney') renderMobileMoney(panel);
   else if(mainTab==='bonnesvolontes') renderBonnesVolontes(panel);
+  else if(mainTab==='ziar') renderZiar(panel);
   else if(mainTab==='depenses') renderDepenses(panel);
   else if(mainTab==='bus') renderBus(panel);
   else if(mainTab==='comptes') renderComptes(panel);
@@ -533,8 +653,9 @@ function renderDashboard(panel){
         }).join('')}
         <tr><td class="lbl">Cotisations Wave / Orange Money</td><td class="val num">${fmt(mmTotal())}</td></tr>
         <tr class="total"><td class="lbl">Total cotisations</td><td class="val num">${fmt(s.totalCotis)}</td></tr>
-        <tr><td class="lbl">Bonnes volontés (dons + ziar)</td><td class="val num">${fmt(s.bv)}</td></tr>
-        <tr class="total"><td class="lbl">Cotisations + Bonnes volontés</td><td class="val num">${fmt(s.totalCotisBV)}</td></tr>
+        <tr><td class="lbl">Bonnes volontés</td><td class="val num">${fmt(s.bv)}</td></tr>
+        <tr><td class="lbl">Ziar</td><td class="val num">${fmt(s.ziar)}</td></tr>
+        <tr class="total"><td class="lbl">Cotisations + Bonnes volontés + Ziar</td><td class="val num">${fmt(s.totalCotisBV)}</td></tr>
         <tr class="total"><td class="lbl">Total caisse</td><td class="val num">${fmt(s.totalCaisse)}</td></tr>
         <tr><td class="lbl">Dépenses (avances décaissées)</td><td class="val num">${fmt(s.totalDep)}</td></tr>
         <tr class="solde"><td class="lbl">Solde de caisse</td><td class="val num">${fmt(s.solde)}</td></tr>
@@ -684,10 +805,13 @@ function renderCotisationsModule(panel){
     <div class="panel">
       <h2>Cotisations par catégorie</h2>
       <p class="lede">Vue détaillée et corrections par catégorie. Pour un encaissement rapide, utilisez l'onglet Encaissement.</p>
+      <div class="toolbar"><button class="btn" id="cotPrintBtn">🖨 Imprimer l'état complet</button><button class="btn" id="cotExportBtn">📊 Exporter Excel (toutes catégories)</button></div>
       <div class="subtabs" id="subtabs"></div>
       <div class="subpanel" id="subpanel"></div>
     </div>
   `;
+  document.getElementById('cotPrintBtn').onclick = ()=>printCotisationsReport();
+  document.getElementById('cotExportBtn').onclick = ()=>exportCotisationsExcel();
   renderCotSubtabs();
   renderCotSubpanel();
 }
@@ -806,8 +930,8 @@ function renderMobileMoney(panel){
         <div class="kpi-card"><div class="v num">${fmt(total)}</div><div class="l">Total mobile money</div></div>
         <div class="kpi-card alt"><div class="v num">${mobilemoney.length}</div><div class="l">Transactions</div></div>
       </div>
-      ${role==='comite' ? `<div class="toolbar"><button class="btn primary" id="mmAddBtn">+ Ajouter un versement</button></div>
-      <div class="addform ${mmAddOpen?'open':''}" id="mmAddForm">
+      <div class="toolbar"><button class="btn" id="mmPrintBtn">🖨 Imprimer l'état</button><button class="btn" id="mmExportBtn">📊 Exporter Excel</button>${role==='comite' ? `<button class="btn primary" id="mmAddBtn">+ Ajouter un versement</button>` : ''}</div>
+      ${role==='comite' ? `<div class="addform ${mmAddOpen?'open':''}" id="mmAddForm">
         <input type="text" id="mm-nom" placeholder="Prénom et nom"/>
         <select id="mm-op"><option value="WAVE">Wave</option><option value="Orange Money">Orange Money</option></select>
         <input type="number" id="mm-montant" placeholder="Montant"/>
@@ -826,6 +950,8 @@ function renderMobileMoney(panel){
       </div>
     </div>
   `;
+  document.getElementById('mmPrintBtn').onclick = ()=>printMobileMoneyReport();
+  document.getElementById('mmExportBtn').onclick = ()=>exportMobileMoneyExcel();
   if(role==='comite'){
     document.getElementById('mmAddBtn').onclick = ()=>{ mmAddOpen=!mmAddOpen; renderMobileMoney(panel); };
     const cancelBtn = document.getElementById('mmCancelBtn');
@@ -854,26 +980,24 @@ function renderBonnesVolontes(panel){
       <h2>Bonnes volontés</h2>
       <p class="lede">Sympathisants et ressortissants hors catégories fixes (diaspora, amis de l'association).</p>
       <div class="kpi-grid" style="margin-bottom:16px;">
-        <div class="kpi-card"><div class="v num">${fmt(total)}</div><div class="l">Total dons + ziar</div></div>
+        <div class="kpi-card"><div class="v num">${fmt(total)}</div><div class="l">Total dons</div></div>
         <div class="kpi-card alt"><div class="v num">${bonnesvolontes.length}</div><div class="l">Contributeurs</div></div>
         <div class="kpi-card alt"><div class="v num">${donsnature.length}</div><div class="l">Dons en nature</div></div>
       </div>
-      <div class="toolbar"><button class="btn" id="bvPrintBtn">🖨 Imprimer l'état</button>${role==='comite' ? `<button class="btn primary" id="bvAddBtn">+ Ajouter un contributeur</button>` : ''}</div>
+      <div class="toolbar"><button class="btn" id="bvPrintBtn">🖨 Imprimer l'état</button><button class="btn" id="bvExportBtn">📊 Exporter Excel</button>${role==='comite' ? `<button class="btn primary" id="bvAddBtn">+ Ajouter un contributeur</button>` : ''}</div>
       ${role==='comite' ? `<div class="addform ${bvAddOpen?'open':''}" id="bvAddForm">
         <input type="text" id="bv-nom" placeholder="Nom / Raison sociale"/>
         <input type="number" id="bv-montant" placeholder="Montant"/>
-        <input type="number" id="bv-ziar" placeholder="Ziar"/>
         <input type="text" id="bv-obs" placeholder="Observation (optionnel)"/>
         <button class="btn primary" id="bvSaveBtn">Enregistrer</button>
         <button class="btn ghost" id="bvCancelBtn">Annuler</button>
       </div>` : ''}
       <div class="mlist" style="margin-top:14px;">
         ${bonnesvolontes.length===0 ? `<div class="empty">Aucun contributeur enregistré.</div>` : bonnesvolontes.map((x,i)=>`
-        <div class="mrow" style="grid-template-columns:28px 1.6fr 1fr 1fr ${role==='comite'?'60px':''};">
+        <div class="mrow" style="grid-template-columns:28px 1.6fr 1fr ${role==='comite'?'60px':''};">
           <div class="idx num">${i+1}</div>
           <div class="name">${x.nom}${x.observation?`<div class="cat-badge">${x.observation}</div>`:''}</div>
           <div class="field"><div class="l">Montant</div><div class="v num">${fmt(x.montant)}</div></div>
-          <div class="field"><div class="l">Ziar</div><div class="v num">${fmt(x.ziar)}</div></div>
           ${role==='comite' ? `<button class="btn danger-ghost" data-del="${x.id}">Suppr.</button>` : ''}
         </div>`).join('')}
       </div>
@@ -901,6 +1025,7 @@ function renderBonnesVolontes(panel){
     </div>
   `;
   document.getElementById('bvPrintBtn').onclick = ()=>printBonnesVolontesReport();
+  document.getElementById('bvExportBtn').onclick = ()=>exportBonnesVolontesExcel();
   if(role==='comite'){
     document.getElementById('bvAddBtn').onclick = ()=>{ bvAddOpen=!bvAddOpen; renderBonnesVolontes(panel); };
     const bvCancel = document.getElementById('bvCancelBtn'); if(bvCancel) bvCancel.onclick=()=>{ bvAddOpen=false; renderBonnesVolontes(panel); };
@@ -908,11 +1033,10 @@ function renderBonnesVolontes(panel){
     if(bvSave) bvSave.onclick = ()=>{
       const nom = document.getElementById('bv-nom').value.trim();
       const montant = parseInt(document.getElementById('bv-montant').value)||0;
-      const ziar = parseInt(document.getElementById('bv-ziar').value)||0;
       const obs = document.getElementById('bv-obs').value.trim();
       if(!nom){ showToast('Le nom est obligatoire'); return; }
       const maxId = bonnesvolontes.reduce((a,x)=>Math.max(a,x.id),0);
-      bonnesvolontes.push({id:maxId+1, nom, montant, ziar, observation:obs});
+      bonnesvolontes.push({id:maxId+1, nom, montant, observation:obs});
       bvAddOpen=false; saveKey('bonnesvolontes', bonnesvolontes, true); renderBonnesVolontes(panel);
     };
     panel.querySelectorAll('[data-del]').forEach(b=>{ b.onclick=()=>{ bonnesvolontes=bonnesvolontes.filter(x=>x.id!==parseInt(b.dataset.del)); saveKey('bonnesvolontes', bonnesvolontes, true); renderBonnesVolontes(panel); }; });
@@ -930,6 +1054,57 @@ function renderBonnesVolontes(panel){
       dnAddOpen=false; saveKey('donsnature', donsnature, true); renderBonnesVolontes(panel);
     };
     panel.querySelectorAll('[data-deldn]').forEach(b=>{ b.onclick=()=>{ donsnature=donsnature.filter(x=>x.id!==parseInt(b.dataset.deldn)); saveKey('donsnature', donsnature, true); renderBonnesVolontes(panel); }; });
+  }
+}
+
+/* ---------- Ziar (rubrique séparée, montant à part) ---------- */
+function renderZiar(panel){
+  const total = ziarTotal();
+  panel.innerHTML = `
+    <div class="panel">
+      <h2>Ziar</h2>
+      <p class="lede">Contributions Ziar, suivies séparément des bonnes volontés.</p>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="v num">${fmt(total)}</div><div class="l">Total Ziar</div></div>
+        <div class="kpi-card alt"><div class="v num">${ziar.length}</div><div class="l">Contributeurs</div></div>
+      </div>
+      <div class="toolbar"><button class="btn" id="ziarPrintBtn">🖨 Imprimer l'état</button><button class="btn" id="ziarExportBtn">📊 Exporter Excel</button>${role==='comite' ? `<button class="btn primary" id="ziarAddBtn">+ Ajouter une contribution</button>` : ''}</div>
+      ${role==='comite' ? `<div class="addform ${ziarAddOpen?'open':''}" id="ziarAddForm">
+        <input type="text" id="ziar-nom" placeholder="Nom / Raison sociale"/>
+        <input type="number" id="ziar-montant" placeholder="Montant"/>
+        <input type="text" id="ziar-obs" placeholder="Observation (optionnel)"/>
+        <button class="btn primary" id="ziarSaveBtn">Enregistrer</button>
+        <button class="btn ghost" id="ziarCancelBtn">Annuler</button>
+      </div>` : ''}
+      <div class="mlist" style="margin-top:14px;">
+        ${ziar.length===0 ? `<div class="empty">Aucune contribution Ziar enregistrée.</div>` : ziar.map((x,i)=>`
+        <div class="mrow" style="grid-template-columns:28px 1.6fr 1fr ${role==='comite'?'60px':''};">
+          <div class="idx num">${i+1}</div>
+          <div class="name">${x.nom}${x.observation?`<div class="cat-badge">${x.observation}</div>`:''}</div>
+          <div class="field"><div class="l">Montant</div><div class="v num">${fmt(x.montant)}</div></div>
+          ${role==='comite' ? `<button class="btn danger-ghost" data-del="${x.id}">Suppr.</button>` : ''}
+        </div>`).join('')}
+      </div>
+    </div>
+  `;
+  document.getElementById('ziarPrintBtn').onclick = ()=>printZiarReport();
+  document.getElementById('ziarExportBtn').onclick = ()=>exportZiarExcel();
+  if(role==='comite'){
+    document.getElementById('ziarAddBtn').onclick = ()=>{ ziarAddOpen=!ziarAddOpen; renderZiar(panel); };
+    const cancelBtn = document.getElementById('ziarCancelBtn'); if(cancelBtn) cancelBtn.onclick = ()=>{ ziarAddOpen=false; renderZiar(panel); };
+    const saveBtn = document.getElementById('ziarSaveBtn');
+    if(saveBtn) saveBtn.onclick = ()=>{
+      const nom = document.getElementById('ziar-nom').value.trim();
+      const montant = parseInt(document.getElementById('ziar-montant').value)||0;
+      const obs = document.getElementById('ziar-obs').value.trim();
+      if(!nom){ showToast('Le nom est obligatoire'); return; }
+      const maxId = ziar.reduce((a,x)=>Math.max(a,x.id),0);
+      ziar.push({id:maxId+1, nom, montant, observation:obs});
+      ziarAddOpen=false; saveKey('ziar', ziar, true); renderZiar(panel);
+    };
+    panel.querySelectorAll('[data-del]').forEach(b=>{
+      b.onclick = ()=>{ ziar = ziar.filter(x=>x.id!==parseInt(b.dataset.del)); saveKey('ziar', ziar, true); renderZiar(panel); };
+    });
   }
 }
 
@@ -951,7 +1126,7 @@ function renderDepenses(panel){
         <div class="kpi-card alt"><div class="v num">${fmt(totalJu)}</div><div class="l">Total justifié</div></div>
         <div class="kpi-card alt"><div class="v num">${fmt(totalAv-totalJu)}</div><div class="l">Reliquat net</div></div>
       </div>
-      <div class="toolbar"><button class="btn" id="depPrintBtn">🖨 Imprimer l'état</button>${role==='comite' ? `<button class="btn primary" id="depAddBtn">+ Ajouter une dépense</button>` : ''}</div>
+      <div class="toolbar"><button class="btn" id="depPrintBtn">🖨 Imprimer l'état</button><button class="btn" id="depExportBtn">📊 Exporter Excel</button>${role==='comite' ? `<button class="btn primary" id="depAddBtn">+ Ajouter une dépense</button>` : ''}</div>
       ${role==='comite' ? `<div class="addform ${depAddOpen?'open':''}" id="depAddForm">
         <input type="text" id="dep-libelle" placeholder="Libellé de la dépense"/>
         <input type="text" id="dep-resp" placeholder="Responsable"/>
@@ -976,6 +1151,7 @@ function renderDepenses(panel){
     </div>
   `;
   document.getElementById('depPrintBtn').onclick = ()=>printDepensesReport();
+  document.getElementById('depExportBtn').onclick = ()=>exportDepensesExcel();
   if(role==='comite'){
     document.getElementById('depAddBtn').onclick = ()=>{ depAddOpen=!depAddOpen; renderDepenses(panel); };
     const cancel = document.getElementById('depCancelBtn'); if(cancel) cancel.onclick=()=>{ depAddOpen=false; renderDepenses(panel); };
@@ -1032,6 +1208,7 @@ function renderBus(panel){
 
       <div class="toolbar">
         <button class="btn" id="busPrintAllBtn">🖨 Imprimer tous les bus</button>
+        <button class="btn" id="busExportBtn">📊 Exporter Excel</button>
       </div>
       ${role==='comite' ? (atMax
         ? `<p class="cat-badge" style="margin-bottom:10px;">Nombre maximum de bus atteint (${buses.length}/${MAX_BUSES}).</p>`
@@ -1048,6 +1225,7 @@ function renderBus(panel){
     </div>
   `;
   document.getElementById('busPrintAllBtn').onclick = ()=>printAllBuses();
+  document.getElementById('busExportBtn').onclick = ()=>exportBusExcel();
   panel.querySelectorAll('.bus-print-one').forEach(btn=>{ btn.onclick = ()=>printBusManifest(parseInt(btn.dataset.busprint)); });
   if(role==='comite'){
     const btDepart = document.getElementById('bt-depart');
@@ -1204,13 +1382,13 @@ function renderComptesContent(panel){
   panel.innerHTML = `
     <div class="panel">
       <h2>Comptes</h2>
-      <p class="lede">Comptes nominatifs pour le comité et les collecteurs. Connexions et modifications sont tracées dans le journal ci-dessous.</p>
+      <p class="lede">Comptes nominatifs pour le comité, les collecteurs, et la consultation en lecture seule. Connexions et modifications sont tracées dans le journal ci-dessous.</p>
       <div class="toolbar"><button class="btn primary" id="userAddBtn">+ Créer un compte</button></div>
       <div class="addform ${userAddOpen?'open':''}" id="userAddForm">
         <input type="text" id="u-username" placeholder="Identifiant (ex. fatou)"/>
         <input type="text" id="u-display" placeholder="Nom affiché (ex. Fatou DIOP)"/>
         <input type="password" id="u-password" placeholder="Mot de passe (4+ caractères)"/>
-        <select id="u-role"><option value="collecteur">Collecteur</option><option value="admin">Administrateur</option></select>
+        <select id="u-role"><option value="collecteur">Collecteur</option><option value="admin">Administrateur</option><option value="consultation">Consultation (lecture seule)</option></select>
         <button class="btn primary" id="userSaveBtn">Créer</button>
         <button class="btn ghost" id="userCancelBtn">Annuler</button>
       </div>
@@ -1219,7 +1397,7 @@ function renderComptesContent(panel){
         <div class="mrow" style="grid-template-columns:28px 1.4fr 1fr 1fr 140px;">
           <div class="idx num">${i+1}</div>
           <div class="name">${u.display_name}<div class="cat-badge">@${u.username}</div></div>
-          <div class="field"><div class="l">Rôle</div><div class="v">${u.role==='admin'?'Administrateur':'Collecteur'}</div></div>
+          <div class="field"><div class="l">Rôle</div><div class="v">${u.role==='admin'?'Administrateur':u.role==='collecteur'?'Collecteur':'Consultation'}</div></div>
           <div class="field"><div class="l">Créé le</div><div class="v" style="font-size:11.5px;">${u.created_at.slice(0,10)}</div></div>
           <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center;">
             <button class="btn sm ghost" data-resetpw="${u.username}" title="Réinitialiser le mot de passe">Mot de passe</button>
@@ -1276,9 +1454,9 @@ function renderComptesContent(panel){
 
 (async function init(){
   const me = await apiMe();
-  if(me.role === 'comite'){
-    currentUser = {username: me.username, display_name: me.display_name, is_admin: me.is_admin};
-    role = 'comite';
+  if(me.username){
+    currentUser = {username: me.username, display_name: me.display_name, is_admin: me.is_admin, account_role: me.account_role};
+    role = me.role;
   }
   await loadAll();
   render();

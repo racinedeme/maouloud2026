@@ -46,6 +46,7 @@ STORAGE_KEYS = {
     "voyageurs": "maouloud2026-voyageurs",
     "synthese": "maouloud2026-synthese",
     "bustransport": "maouloud2026-bustransport",
+    "ziar": "maouloud2026-ziar",
 }
 
 # ---------------------------------------------------------------------------
@@ -193,10 +194,12 @@ def current_session(request: Request):
 
 
 def require_writer(request: Request) -> dict:
-    """Admin or collecteur — anyone with a valid account can write."""
+    """Admin or collecteur — a 'consultation' account is read-only."""
     s = current_session(request)
     if not s:
         raise HTTPException(status_code=401, detail="Connexion requise")
+    if s["role"] not in ("admin", "collecteur"):
+        raise HTTPException(status_code=403, detail="Compte en lecture seule — écriture non autorisée")
     return s
 
 
@@ -271,11 +274,13 @@ def me(request: Request):
     s = current_session(request)
     if not s:
         return {"role": "membre"}
+    frontend_role = "comite" if s["role"] in ("admin", "collecteur") else "membre"
     return {
-        "role": "comite",
+        "role": frontend_role,
         "username": s["username"],
         "display_name": s["display_name"],
         "is_admin": s["role"] == "admin",
+        "account_role": s["role"],
     }
 
 
@@ -314,7 +319,7 @@ def create_user(body: CreateUserBody, request: Request):
     username = body.username.strip().lower()
     if not username or not body.password or len(body.password) < 4:
         raise HTTPException(status_code=400, detail="Nom d'utilisateur et mot de passe (4+ caractères) requis")
-    if body.role not in ("admin", "collecteur"):
+    if body.role not in ("admin", "collecteur", "consultation"):
         raise HTTPException(status_code=400, detail="Rôle invalide")
     if get_user(username):
         raise HTTPException(status_code=409, detail="Ce nom d'utilisateur existe déjà")
