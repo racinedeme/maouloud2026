@@ -111,9 +111,13 @@ def init_db():
             " username TEXT NOT NULL,"
             " action TEXT NOT NULL,"
             " target TEXT,"
+            " detail TEXT,"
             " at TEXT NOT NULL"
             ")"
         )
+        audit_cols = {row[1] for row in conn.execute("PRAGMA table_info(audit_log)")}
+        if "detail" not in audit_cols:
+            conn.execute("ALTER TABLE audit_log ADD COLUMN detail TEXT")
 
         existing = {row[0] for row in conn.execute("SELECT key FROM kv")}
         if not existing and SEED_PATH.exists():
@@ -153,12 +157,102 @@ def kv_set(key: str, value: str):
         )
 
 
-def log_action(username: str, action: str, target: str | None = None):
+def log_action(username: str, action: str, target: str | None = None, detail: str | None = None):
     with db() as conn:
         conn.execute(
-            "INSERT INTO audit_log (username, action, target, at) VALUES (?,?,?,?)",
-            (username, action, target, now_iso()),
+            "INSERT INTO audit_log (username, action, target, detail, at) VALUES (?,?,?,?,?)",
+            (username, action, target, detail, now_iso()),
         )
+
+
+def _item_label(item) -> str:
+    """Best-effort human-readable label for a record in one of our data modules."""
+    if not isinstance(item, dict):
+        return str(item)
+    prenom, nom = item.get("prenom"), item.get("nom")
+    if prenom and nom:
+        return f"{prenom} {nom}"
+    if nom:
+        return str(nom)
+    for k in ("libelle", "donateur", "operateur"):
+        if item.get(k):
+            return str(item[k])
+    return f"#{item.get('id', '?')}"
+
+
+def _item_amount(item):
+    if not isinstance(item, dict):
+        return None
+    for k in ("montant", "montant_verse", "avance", "justifie"):
+        v = item.get(k)
+        if isinstance(v, (int, float)):
+            return v
+    return None
+
+
+def diff_summary(old_raw: str | None, new_raw: str, max_len: int = 600) -> str | None:
+    """Human-readable summary of what changed between two stored JSON values —
+    insertions, modifications and deletions — for the activity log. Returns
+    None when nothing actually changed (e.g. a resave of identical data)."""
+    try:
+        old_val = json.loads(old_raw) if old_raw is not None else None
+        new_val = json.loads(new_raw)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+    if isinstance(new_val, list) and (old_val is None or isinstance(old_val, list)):
+        old_by_id, new_by_id = {}, {}
+        for it in (old_val or []):
+            if isinstance(it, dict) and "id" in it:
+                old_by_id[it["id"]] = it
+        for it in new_val:
+            if isinstance(it, dict) and "id" in it:
+                new_by_id[it["id"]] = it
+        added_ids = [i for i in new_by_id if i not in old_by_id]
+        removed_ids = [i for i in old_by_id if i not in new_by_id]
+        modified_ids = [i for i in new_by_id if i in old_by_id and new_by_id[i] != old_by_id[i]]
+
+        parts = []
+        if added_ids:
+            labels = []
+            for i in added_ids[:6]:
+                it = new_by_id[i]
+                amt = _item_amount(it)
+                labels.append(_item_label(it) + (f" ({amt})" if amt is not None else ""))
+            more = f" (+{len(added_ids)-6} autres)" if len(added_ids) > 6 else ""
+            parts.append(f"{len(added_ids)} ajout(s) : " + ", ".join(labels) + more)
+        if modified_ids:
+            details = []
+            for i in modified_ids[:6]:
+                old_it, new_it = old_by_id[i], new_by_id[i]
+                changed_fields = []
+                for k in set(old_it.keys()) | set(new_it.keys()):
+                    if k == "id":
+                        continue
+                    ov, nv = old_it.get(k), new_it.get(k)
+                    if ov != nv:
+                        changed_fields.append(f"{k}: {ov} → {nv}")
+                if changed_fields:
+                    details.append(f"{_item_label(new_it)} ({'; '.join(changed_fields[:3])})")
+            more = f" (+{len(modified_ids)-6} autres)" if len(modified_ids) > 6 else ""
+            parts.append(f"{len(modified_ids)} modification(s) : " + " · ".join(details) + more)
+        if removed_ids:
+            labels = [_item_label(old_by_id[i]) for i in removed_ids[:6]]
+            more = f" (+{len(removed_ids)-6} autres)" if len(removed_ids) > 6 else ""
+            parts.append(f"{len(removed_ids)} suppression(s) : " + ", ".join(labels) + more)
+        if not parts:
+            return None
+        summary = " · ".join(parts)
+    elif isinstance(new_val, dict):
+        old_dict = old_val if isinstance(old_val, dict) else {}
+        changed = [f"{k}: {old_dict.get(k)} → {new_val.get(k)}" for k in (set(old_dict.keys()) | set(new_val.keys())) if old_dict.get(k) != new_val.get(k)]
+        if not changed:
+            return None
+        summary = "; ".join(changed)
+    else:
+        summary = f"Nouvelle valeur : {new_val}"
+
+    return summary[:max_len] + "…" if len(summary) > max_len else summary
 
 
 # ---------------------------------------------------------------------------
@@ -228,6 +322,16 @@ def require_writer(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Connexion requise")
     if s["role"] not in ("admin", "collecteur"):
         raise HTTPException(status_code=403, detail="Compte en lecture seule — écriture non autorisée")
+    return s
+
+
+def require_login(request: Request) -> dict:
+    """Any authenticated account (admin, collecteur or consultation). There is
+    no anonymous access to the platform's data anymore — every visitor must
+    have a named account, even for read-only consultation."""
+    s = current_session(request)
+    if not s:
+        raise HTTPException(status_code=401, detail="Connexion requise")
     return s
 
 
@@ -336,7 +440,8 @@ def me(request: Request):
 
 
 @app.get("/api/store/{key}")
-def get_store(key: str):
+def get_store(key: str, request: Request):
+    require_login(request)
     value = kv_get(key)
     if value is None:
         raise HTTPException(status_code=404, detail="Clé introuvable")
@@ -347,8 +452,10 @@ def get_store(key: str):
 def put_store(key: str, body: StoreBody, request: Request):
     s = require_writer(request)
     check_module_permission(s, key)
+    old_value = kv_get(key)
     kv_set(key, body.value)
-    log_action(s["username"], "update", key)
+    detail = diff_summary(old_value, body.value)
+    log_action(s["username"], "update", key, detail)
     return {"key": key, "ok": True}
 
 
@@ -386,7 +493,7 @@ def create_user(body: CreateUserBody, request: Request):
             "INSERT INTO users (username, password_hash, salt, display_name, role, permissions, created_at) VALUES (?,?,?,?,?,?,?)",
             (username, h, salt, body.display_name.strip() or username, body.role, json.dumps(perms), now_iso()),
         )
-    log_action(s["username"], "create_user", username)
+    log_action(s["username"], "create_user", username, f"rôle : {body.role}" + (f" · modules : {', '.join(perms)}" if perms else (" · accès complet" if body.role == "collecteur" else "")))
     return {"ok": True}
 
 
@@ -401,7 +508,7 @@ def set_permissions(username: str, body: SetPermissionsBody, request: Request):
     with db() as conn:
         conn.execute("UPDATE users SET permissions=? WHERE username=?", (json.dumps(perms), username))
     # Live sessions for that user keep their old permissions until they log back in.
-    log_action(s["username"], "set_permissions", username)
+    log_action(s["username"], "set_permissions", username, f"modules : {', '.join(perms)}" if perms else "accès complet")
     return {"ok": True}
 
 
@@ -443,9 +550,9 @@ def get_audit(request: Request):
     require_admin(request)
     with db() as conn:
         rows = conn.execute(
-            "SELECT username, action, target, at FROM audit_log ORDER BY id DESC LIMIT 300"
+            "SELECT username, action, target, detail, at FROM audit_log ORDER BY id DESC LIMIT 300"
         ).fetchall()
-    return [{"username": r[0], "action": r[1], "target": r[2], "at": r[3]} for r in rows]
+    return [{"username": r[0], "action": r[1], "target": r[2], "detail": r[3], "at": r[4]} for r in rows]
 
 
 # Serve the frontend. Declared last so /api/* routes above take priority.

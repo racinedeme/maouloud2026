@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-<title>Maouloud 2026 — Gestion de l'association</title>
+<title>Barobe Diackel — Association Maouloud 2026</title>
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#123B2F">
 <link rel="icon" href="/icons/icon-192.png">
@@ -31,6 +31,8 @@
   .masthead h1{font-family:'Fraunces',serif;font-weight:600;font-size:25px;letter-spacing:-0.01em;margin:0 0 4px;color:var(--primary-dark);}
   .masthead .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:0.14em;color:var(--accent);font-weight:700;margin-bottom:6px;}
   .masthead p.sub{margin:0;color:var(--ink-soft);font-size:13.5px;}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand-logo{width:46px;height:46px;border-radius:50%;object-fit:cover;flex-shrink:0;box-shadow:var(--shadow);}
 
   .role-toggle{display:flex;background:var(--paper-raised);border:1px solid var(--line);border-radius:10px;padding:3px;box-shadow:var(--shadow);flex-shrink:0;}
   .role-toggle button{border:none;background:transparent;padding:8px 14px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink-soft);font-family:inherit;transition:all .15s;}
@@ -187,6 +189,9 @@
   .print-table th{background:#eee;}
   .print-header h1{font-family:Georgia,serif;font-size:20px;margin:0 0 4px;}
   .print-header .meta{font-size:12px;color:#555;margin-bottom:4px;}
+  .print-header{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+  .print-header img{width:52px;height:52px;border-radius:50%;object-fit:cover;flex-shrink:0;}
+  .print-header .print-header-text{flex:1;}
   @media print{
     body *{visibility:hidden;}
     #printArea, #printArea *{visibility:visible;}
@@ -257,6 +262,12 @@ const MODULE_LABELS = {
   encaissement:'Encaissement', cotisations:'Cotisations', mobilemoney:'Wave / Orange Money',
   bonnesvolontes:'Bonnes volontés', ziar:'Ziar', depenses:'Dépenses', bus:'Bus & voyageurs'
 };
+const STORAGE_KEY_LABELS = {
+  'maouloud2026-members':'Cotisations', 'maouloud2026-mobilemoney':'Wave / Orange Money',
+  'maouloud2026-bonnesvolontes':'Bonnes volontés', 'maouloud2026-donsnature':'Dons en nature',
+  'maouloud2026-depenses':'Dépenses', 'maouloud2026-buses':'Bus', 'maouloud2026-voyageurs':'Voyageurs',
+  'maouloud2026-synthese':'Tableau de bord', 'maouloud2026-bustransport':'Transport bus', 'maouloud2026-ziar':'Ziar'
+};
 function hasModulePermission(moduleKey){
   if(!GATED_MODULES.includes(moduleKey)) return true;
   if(!currentUser) return false;
@@ -323,7 +334,7 @@ function doPrint(html){
 }
 function printHeader(title){
   const now = new Date().toLocaleDateString('fr-FR', {day:'numeric',month:'long',year:'numeric'});
-  return `<div class="print-header"><h1>${title}</h1><div class="meta">Association Maouloud 2026 — édité le ${now}</div></div>`;
+  return `<div class="print-header"><img src="/logo-barobe.png" alt="Barobe Diackel"/><div class="print-header-text"><h1>${title}</h1><div class="meta">Barobe Diackel — Association Maouloud 2026 — édité le ${now}</div></div></div>`;
 }
 function printBusManifest(busId){
   const b = buses.find(x=>x.id===busId);
@@ -416,7 +427,6 @@ function showToast(msg){
 }
 
 let currentUser = null; // {username, display_name, is_admin} or null when logged out
-let loginFormOpen = false;
 
 async function apiLogin(username, password){
   try{
@@ -564,24 +574,29 @@ const MAIN_TABS = [
   {key:'comptes', label:'Comptes', roles:['comite'], adminOnly:true},
 ];
 
+const APP_NAME = 'Barobe Diackel';
+
 function render(){
   const app = document.getElementById('app');
 
-  /* Mode kiosque : écran de connexion obligatoire tant qu'aucun compte n'est
-     connecté — évite qu'un poste dédié affiche des données en accédant
-     simplement à l'URL sans identifiants. */
-  if(kioskMode && !currentUser){
+  /* Authentification obligatoire pour accéder à la plateforme, kiosque ou non —
+     aucune consultation anonyme n'est possible. Un compte "Consultation" existe
+     pour ceux qui n'ont besoin que d'un accès en lecture nominatif. */
+  if(!currentUser){
     app.innerHTML = `
       <div class="masthead">
-        <div>
-          <div class="eyebrow">Maouloud 2026 · Poste dédié</div>
-          <h1>Connexion requise</h1>
-          <p class="sub">Ce poste est réservé — connectez-vous avec votre compte pour continuer.</p>
+        <div class="brand">
+          <img src="/logo-barobe.png" alt="${APP_NAME}" class="brand-logo"/>
+          <div>
+            <div class="eyebrow">${APP_NAME}${kioskMode ? ' · Poste dédié' : ''}</div>
+            <h1>Connexion requise</h1>
+          </div>
         </div>
       </div>
-      <div class="panel" style="max-width:380px;margin:30px auto 0;">
+      <div class="panel" style="max-width:380px;margin:30px auto 0;text-align:center;">
+        <img src="/logo-barobe.png" alt="${APP_NAME}" style="width:88px;height:88px;border-radius:50%;object-fit:cover;margin:0 auto 14px;display:block;"/>
         <h2>Connexion</h2>
-        <p class="lede">Identifiant et mot de passe fournis par le comité.</p>
+        <p class="lede">${kioskMode ? "Ce poste est réservé — connectez-vous avec votre compte pour continuer." : "Identifiant et mot de passe fournis par le comité."}</p>
         <div class="addform open" style="margin-top:4px;">
           <input type="text" id="login-username" placeholder="Nom d'utilisateur" autocomplete="username"/>
           <input type="password" id="login-password" placeholder="Mot de passe" autocomplete="current-password"/>
@@ -597,6 +612,7 @@ function render(){
       if(!res){ showToast('Identifiants incorrects'); return; }
       currentUser = {username: res.username, display_name: res.display_name, is_admin: res.role==='admin', account_role: res.role, permissions: res.permissions||[]};
       role = (res.role==='admin' || res.role==='collecteur') ? 'comite' : 'membre';
+      await loadAll();
       render();
     };
     document.getElementById('loginSubmitBtn').onclick = submit;
@@ -605,14 +621,17 @@ function render(){
   }
 
   /* Mode kiosque : le compte connecté doit avoir la permission du module assigné à ce poste. */
-  if(kioskMode && currentUser && !hasModulePermission(mainTab)){
+  if(kioskMode && !hasModulePermission(mainTab)){
     const label = (MAIN_TABS.find(t=>t.key===mainTab)||{}).label || mainTab;
     app.innerHTML = `
       <div class="masthead">
-        <div>
-          <div class="eyebrow">Maouloud 2026 · Poste dédié</div>
-          <h1>Accès refusé</h1>
-          <p class="sub">Le compte ${currentUser.display_name} n'a pas accès au module « ${label} ».</p>
+        <div class="brand">
+          <img src="/logo-barobe.png" alt="${APP_NAME}" class="brand-logo"/>
+          <div>
+            <div class="eyebrow">${APP_NAME} · Poste dédié</div>
+            <h1>Accès refusé</h1>
+            <p class="sub">Le compte ${currentUser.display_name} n'a pas accès au module « ${label} ».</p>
+          </div>
         </div>
         <div class="role-toggle" style="align-items:center;gap:4px;">
           <button id="logoutBtn">Déconnexion</button>
@@ -637,23 +656,18 @@ function render(){
 
   app.innerHTML = `
     <div class="masthead">
-      <div>
-        <div class="eyebrow">Maouloud 2026${kioskMode ? ' · Poste dédié' : ''}</div>
-        <h1>${kioskMode ? activeTabDef.label : "Gestion de l'association"}</h1>
-        <p class="sub">${gs.count} membres · ${buses.length} bus · ${currentUser ? ('Connecté : '+currentUser.display_name+(currentUser.account_role==='admin'?' (admin)':currentUser.account_role==='consultation'?' (consultation)':'')) : 'Consultation publique'}</p>
+      <div class="brand">
+        <img src="/logo-barobe.png" alt="${APP_NAME}" class="brand-logo"/>
+        <div>
+          <div class="eyebrow">${APP_NAME}${kioskMode ? ' · Poste dédié' : ''}</div>
+          <h1>${kioskMode ? activeTabDef.label : APP_NAME}</h1>
+          <p class="sub">${gs.count} membres · ${buses.length} bus · Connecté : ${currentUser.display_name}${currentUser.account_role==='admin'?' (admin)':currentUser.account_role==='consultation'?' (consultation)':''}</p>
+        </div>
       </div>
       <div class="role-toggle" style="align-items:center;gap:4px;">
-        ${currentUser
-          ? `<span style="font-size:12px;color:var(--ink-soft);padding:0 6px;">${currentUser.display_name}</span><button id="logoutBtn">Déconnexion</button>`
-          : `<button id="loginToggleBtn">${loginFormOpen?'Annuler':'Se connecter'}</button>`}
+        <button id="logoutBtn">Déconnexion</button>
       </div>
     </div>
-    ${(!currentUser && loginFormOpen) ? `
-    <div class="addform open" id="loginForm" style="margin-bottom:14px;">
-      <input type="text" id="login-username" placeholder="Nom d'utilisateur" autocomplete="username"/>
-      <input type="password" id="login-password" placeholder="Mot de passe" autocomplete="current-password"/>
-      <button class="btn primary" id="loginSubmitBtn">Connexion</button>
-    </div>` : ''}
     <div class="mainnav" id="mainnav"></div>
     <div id="panel"></div>
   `;
@@ -666,22 +680,7 @@ function render(){
     nav.querySelectorAll('.navbtn').forEach(el=>{ el.onclick = ()=>{ mainTab = el.dataset.tab; encSelectedId=null; render(); }; });
   }
 
-  const loginToggleBtn = document.getElementById('loginToggleBtn');
-  if(loginToggleBtn) loginToggleBtn.onclick = ()=>{ loginFormOpen = !loginFormOpen; render(); };
-  const loginSubmitBtn = document.getElementById('loginSubmitBtn');
-  if(loginSubmitBtn) loginSubmitBtn.onclick = async ()=>{
-    const username = document.getElementById('login-username').value.trim();
-    const password = document.getElementById('login-password').value;
-    if(!username || !password){ showToast('Nom d\'utilisateur et mot de passe requis'); return; }
-    const res = await apiLogin(username, password);
-    if(!res){ showToast('Identifiants incorrects'); return; }
-    currentUser = {username: res.username, display_name: res.display_name, is_admin: res.role==='admin', account_role: res.role, permissions: res.permissions||[]};
-    role = (res.role==='admin' || res.role==='collecteur') ? 'comite' : 'membre';
-    loginFormOpen = false;
-    render();
-  };
-  const logoutBtn = document.getElementById('logoutBtn');
-  if(logoutBtn) logoutBtn.onclick = async ()=>{
+  document.getElementById('logoutBtn').onclick = async ()=>{
     await apiLogout();
     currentUser = null; role = 'membre';
     if(!kioskMode) mainTab = 'dashboard';
@@ -689,11 +688,6 @@ function render(){
   };
 
   const panel = document.getElementById('panel');
-  const requiresLogin = activeTabDef.roles.includes('comite') && !activeTabDef.roles.includes('membre');
-  if(requiresLogin && role!=='comite'){
-    panel.innerHTML = `<div class="panel"><h2>${activeTabDef.label}</h2><p class="lede">Connectez-vous avec un compte collecteur pour accéder à ce poste.</p></div>`;
-    return;
-  }
   if(activeTabDef.adminOnly && !isAdmin){
     panel.innerHTML = `<div class="panel"><h2>${activeTabDef.label}</h2><p class="lede">Accès réservé aux administrateurs.</p></div>`;
     return;
@@ -1466,7 +1460,7 @@ async function renderComptes(panel){
   renderComptesContent(panel);
 }
 function auditLabel(action){
-  const map = {login:'Connexion', logout:'Déconnexion', update:'Modification de données', create_user:'Création de compte', delete_user:'Suppression de compte', reset_password:'Réinitialisation de mot de passe'};
+  const map = {login:'Connexion', logout:'Déconnexion', update:'Modification de données', create_user:'Création de compte', delete_user:'Suppression de compte', reset_password:'Réinitialisation de mot de passe', set_permissions:'Modification des modules autorisés'};
   return map[action] || action;
 }
 function moduleCheckboxes(idPrefix, checkedList){
@@ -1534,7 +1528,10 @@ function renderComptesContent(panel){
         <h3 style="font-family:'Fraunces',serif;font-size:16px;color:var(--primary-dark);margin:0 0 10px;">Journal d'activité</h3>
         <div class="mlist">
           ${auditCache.length===0 ? `<div class="empty">Aucune activité enregistrée.</div>` : auditCache.slice(0,50).map(a=>`
-          <div class="log-item"><span><b>${a.username}</b> — ${auditLabel(a.action)}${a.target?(' · '+a.target):''}</span><span class="t">${a.at.replace('T',' ').slice(0,16)}</span></div>
+          <div class="log-item" style="flex-direction:column;align-items:stretch;gap:2px;">
+            <div style="display:flex;justify-content:space-between;"><span><b>${a.username}</b> — ${auditLabel(a.action)}${a.target?(' · '+(STORAGE_KEY_LABELS[a.target]||a.target)):''}</span><span class="t">${a.at.replace('T',' ').slice(0,16)}</span></div>
+            ${a.detail ? `<div style="font-size:11.5px;color:var(--ink-soft);padding-left:2px;">${a.detail}</div>` : ''}
+          </div>
           `).join('')}
         </div>
       </div>
@@ -1604,8 +1601,8 @@ function renderComptesContent(panel){
   if(me.username){
     currentUser = {username: me.username, display_name: me.display_name, is_admin: me.is_admin, account_role: me.account_role, permissions: me.permissions||[]};
     role = me.role;
+    await loadAll();
   }
-  await loadAll();
   render();
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('/service-worker.js').catch(()=>{});

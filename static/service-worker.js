@@ -1,5 +1,5 @@
-const CACHE_NAME = 'maouloud2026-v1';
-const APP_SHELL = ['/', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
+const CACHE_NAME = 'maouloud2026-v2';
+const APP_SHELL = ['/', '/manifest.json', '/logo-barobe.png', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
