@@ -1468,7 +1468,13 @@ function wireBusCards(panel){
     };
   });
   panel.querySelectorAll('[data-voynewphone]').forEach(inp=>{
-    inp.onchange = (e)=>{ const id=inp.dataset.voynewphone; voyForm[id].telephone = e.target.value.trim(); };
+    inp.oninput = (e)=>{
+      const id = inp.dataset.voynewphone;
+      voyForm[id].telephone = e.target.value;
+      renderBus(panel);
+      const el = panel.querySelector(`[data-voynewphone="${id}"]`);
+      if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+    };
   });
   panel.querySelectorAll('[data-voysave]').forEach(btn=>{
     btn.onclick = ()=>{
@@ -1492,11 +1498,14 @@ function wireBusCards(panel){
     };
   });
   panel.querySelectorAll('[data-voyphone]').forEach(inp=>{
-    inp.onchange = (e)=>{
-      const v = voyageurs.find(x=>x.id===parseInt(inp.dataset.voyphone));
-      v.telephone = e.target.value.trim();
+    inp.oninput = (e)=>{
+      const id = parseInt(inp.dataset.voyphone);
+      const v = voyageurs.find(x=>x.id===id);
+      v.telephone = e.target.value;
       saveKeyDebounced('voyageurs', voyageurs);
       renderBus(panel);
+      const el = panel.querySelector(`[data-voyphone="${id}"]`);
+      if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
     };
   });
   panel.querySelectorAll('[data-delvoy]').forEach(btn=>{
