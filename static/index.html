@@ -238,6 +238,7 @@ let mainTab = 'dashboard';
 let catTab = 'overview';
 let searchQuery = '', statusFilter = 'all', sortByReste = false, addFormOpen = false;
 let encQuery = '', encSelectedId = null;
+let encConfirmation = null; // {prenom, nom, telephone, montant, reste} shown right after a payment is saved
 let sessionLog = [];
 let mmAddOpen = false, bvAddOpen = false, dnAddOpen = false, depAddOpen = false, busAddOpen = false, ziarAddOpen = false;
 let voyForm = {}; // {busId: {open, isMember, memberQuery, memberId}}
@@ -804,7 +805,7 @@ function renderSelfLookup(){
 /* ---------- Encaissement (cashier — category-blind search) ---------- */
 function renderEncaissement(panel){
   let resultsHtml = '';
-  if(encQuery.trim().length>0 && encSelectedId===null){
+  if(encConfirmation===null && encQuery.trim().length>0 && encSelectedId===null){
     const q = encQuery.trim().toLowerCase();
     const matches = members.filter(m=>(m.prenom+' '+m.nom).toLowerCase().includes(q)).slice(0,10);
     resultsHtml = matches.length===0
@@ -818,8 +819,25 @@ function renderEncaissement(panel){
         }).join('')}</div>`;
   }
 
+  let confirmationHtml = '';
+  if(encConfirmation){
+    const c = encConfirmation;
+    const waLink = memberPaymentWhatsAppLink(c.prenom, c.nom, c.telephone, c.montant, c.reste);
+    confirmationHtml = `
+      <div class="receipt" style="border-color:var(--primary);">
+        <div class="receipt-head">
+          <div><div class="n">✓ Versement enregistré — ${c.prenom} ${c.nom||''}</div><div class="c">${fmt(c.montant)} FCFA reçus · ${c.reste>0 ? 'Reste '+fmt(c.reste)+' FCFA' : 'Cotisation complète'}</div></div>
+          <button class="btn ghost sm" id="encConfirmClose">Fermer</button>
+        </div>
+        ${waLink
+          ? `<div class="toolbar" style="margin-top:10px;"><a class="btn" href="${waLink}" target="_blank" rel="noopener" style="background:#25D366;color:#fff;border:none;text-decoration:none;">📱 Envoyer la confirmation par WhatsApp</a></div>`
+          : `<p class="lede" style="margin-top:10px;">Aucun numéro de téléphone enregistré pour ce membre — pas d'envoi possible.</p>`}
+      </div>
+    `;
+  }
+
   let receiptHtml = '';
-  const sel = encSelectedId!==null ? members.find(m=>m.id===encSelectedId) : null;
+  const sel = (encConfirmation===null && encSelectedId!==null) ? members.find(m=>m.id===encSelectedId) : null;
   if(sel){
     const cat = CATEGORIES.find(c=>c.key===sel.categorie);
     const reste = Math.max(sel.montant_attendu-sel.montant_verse,0);
@@ -847,11 +865,11 @@ function renderEncaissement(panel){
     <div class="panel">
       <h2>Encaissement</h2>
       <p class="lede">Recherchez un membre par son nom — la catégorie est retrouvée automatiquement, pas besoin de la connaître à l'avance.</p>
-      <div class="enc-search">
+      ${encConfirmation ? '' : `<div class="enc-search">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input type="text" id="encInput" placeholder="Nom du membre..." value="${encQuery}" autocomplete="off"/>
-      </div>
-      ${receiptHtml || resultsHtml}
+      </div>`}
+      ${confirmationHtml || receiptHtml || resultsHtml}
       <div class="session-log">
         <h4>Encaissements de cette session</h4>
         ${sessionLog.length===0 ? `<div class="empty">Aucun encaissement enregistré pour l'instant.</div>` :
@@ -861,14 +879,18 @@ function renderEncaissement(panel){
   `;
 
   const input = document.getElementById('encInput');
-  input.oninput = (e)=>{ encQuery = e.target.value; encSelectedId=null; renderEncaissement(panel);
-    const el = document.getElementById('encInput'); el.focus(); el.setSelectionRange(encQuery.length, encQuery.length); };
+  if(input){
+    input.oninput = (e)=>{ encQuery = e.target.value; encSelectedId=null; renderEncaissement(panel);
+      const el = document.getElementById('encInput'); el.focus(); el.setSelectionRange(encQuery.length, encQuery.length); };
+  }
 
   panel.querySelectorAll('.enc-result').forEach(el=>{
     el.onclick = ()=>{ encSelectedId = parseInt(el.dataset.id); renderEncaissement(panel); };
   });
   const cancelBtn = document.getElementById('encCancel');
   if(cancelBtn) cancelBtn.onclick = ()=>{ encSelectedId=null; encQuery=''; renderEncaissement(panel); };
+  const confirmCloseBtn = document.getElementById('encConfirmClose');
+  if(confirmCloseBtn) confirmCloseBtn.onclick = ()=>{ encConfirmation=null; encSelectedId=null; encQuery=''; renderEncaissement(panel); };
   const saveBtn = document.getElementById('encSave');
   if(saveBtn) saveBtn.onclick = ()=>{
     const m = members.find(x=>x.id===encSelectedId);
@@ -882,9 +904,14 @@ function renderEncaissement(panel){
     if(hasAmt) m.montant_verse += amt;
     if(phoneChanged) m.telephone = phone;
     saveKey('members', members, true);
-    if(hasAmt) sessionLog.push({nom:`${m.prenom} ${m.nom}`, montant:amt, time:new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})});
-    showToast(hasAmt ? 'Versement enregistré' : 'Téléphone mis à jour');
-    encSelectedId=null; encQuery='';
+    if(hasAmt){
+      sessionLog.push({nom:`${m.prenom} ${m.nom}`, montant:amt, time:new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})});
+      encConfirmation = {prenom:m.prenom, nom:m.nom, telephone:m.telephone||'', montant:amt, reste:Math.max(m.montant_attendu-m.montant_verse,0)};
+      encSelectedId=null; encQuery='';
+    }else{
+      showToast('Téléphone mis à jour');
+      encSelectedId=null; encQuery='';
+    }
     renderEncaissement(panel);
   };
 }
@@ -1287,6 +1314,15 @@ function busWhatsAppLink(v, b){
   if(!phone) return null;
   const dateLabel = busTransport.date_depart ? formatDateFr(busTransport.date_depart) : 'date à confirmer';
   const msg = `Bonjour ${v.nom}, vous êtes inscrit(e) sur ${b.nom} pour le Maouloud 2026 à Barobé Diackel. Départ : ${busTransport.depart} → ${busTransport.destination}, le ${dateLabel}. Merci d'arriver 30 minutes avant le départ.`;
+  return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+}
+function memberPaymentWhatsAppLink(prenom, nom, telephone, montant, reste){
+  const phone = normalizePhone(telephone);
+  if(!phone) return null;
+  const nomComplet = `${prenom} ${nom||''}`.trim();
+  const msg = reste>0
+    ? `Bonjour ${nomComplet}, nous confirmons la réception de votre versement de ${fmt(montant)} FCFA pour la cotisation Maouloud 2026 (Association Barobé Diackel). Solde restant : ${fmt(reste)} FCFA. Merci !`
+    : `Bonjour ${nomComplet}, nous confirmons la réception de votre versement de ${fmt(montant)} FCFA. Votre cotisation Maouloud 2026 (Association Barobé Diackel) est maintenant complète. Merci pour votre confiance !`;
   return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
 }
 function renderBus(panel){
