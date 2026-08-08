@@ -297,9 +297,9 @@ function exportExcel(filename, sheetsDef){
 function exportCotisationsExcel(){
   const rows = members.map(m=>{
     const cat = CATEGORIES.find(c=>c.key===m.categorie);
-    return [cat?cat.label:m.categorie, m.prenom, m.nom||'', m.montant_attendu, m.montant_verse, Math.max(m.montant_attendu-m.montant_verse,0), statusOf(m)==='paid'?'Payé':statusOf(m)==='partial'?'Partiel':'Non payé'];
+    return [cat?cat.label:m.categorie, m.prenom, m.nom||'', m.montant_attendu, m.montant_verse, Math.max(m.montant_attendu-m.montant_verse,0), statusOf(m)==='paid'?'Payé':statusOf(m)==='partial'?'Partiel':'Non payé', m.telephone||''];
   });
-  exportExcel('maouloud2026-cotisations.xlsx', [{name:'Cotisations', headers:['Catégorie','Prénom','Nom','Attendu','Versé','Reste','Statut'], rows}]);
+  exportExcel('maouloud2026-cotisations.xlsx', [{name:'Cotisations', headers:['Catégorie','Prénom','Nom','Attendu','Versé','Reste','Statut','Téléphone'], rows}]);
 }
 function exportMobileMoneyExcel(){
   const rows = mobilemoney.map(x=>[x.nom, x.operateur, x.montant]);
@@ -323,8 +323,8 @@ function exportDepensesExcel(){
 }
 function exportBusExcel(){
   const rows = [];
-  buses.forEach(b=>{ busOccupants(b.id).forEach(v=>{ rows.push([b.nom, v.nom, v.est_membre?'Membre':'Non-membre']); }); });
-  exportExcel('maouloud2026-bus-voyageurs.xlsx', [{name:'Voyageurs', headers:['Bus','Nom','Statut'], rows}]);
+  buses.forEach(b=>{ busOccupants(b.id).forEach(v=>{ rows.push([b.nom, v.nom, v.est_membre?'Membre':'Non-membre', v.telephone||'']); }); });
+  exportExcel('maouloud2026-bus-voyageurs.xlsx', [{name:'Voyageurs', headers:['Bus','Nom','Statut','Téléphone'], rows}]);
 }
 
 /* ---------- Printing ---------- */
@@ -836,7 +836,8 @@ function renderEncaissement(panel){
         </div>
         <div class="receipt-input">
           <div class="fld"><label>Montant reçu maintenant (FCFA)</label><input type="number" id="encAmount" min="0" placeholder="0"/></div>
-          <button class="btn primary" id="encSave">Enregistrer le versement</button>
+          <div class="fld"><label>Téléphone (pour SMS/WhatsApp)</label><input type="tel" id="encPhone" placeholder="77 000 00 00" value="${sel.telephone||''}"/></div>
+          <button class="btn primary" id="encSave">Enregistrer</button>
         </div>
       </div>
     `;
@@ -870,13 +871,19 @@ function renderEncaissement(panel){
   if(cancelBtn) cancelBtn.onclick = ()=>{ encSelectedId=null; encQuery=''; renderEncaissement(panel); };
   const saveBtn = document.getElementById('encSave');
   if(saveBtn) saveBtn.onclick = ()=>{
-    const amtInput = document.getElementById('encAmount');
-    let amt = parseInt(amtInput.value);
-    if(isNaN(amt) || amt<=0){ showToast('Entrez un montant valide'); return; }
     const m = members.find(x=>x.id===encSelectedId);
-    m.montant_verse += amt;
+    const amtInput = document.getElementById('encAmount');
+    const phoneInput = document.getElementById('encPhone');
+    const phone = phoneInput.value.trim();
+    let amt = parseInt(amtInput.value);
+    const hasAmt = !isNaN(amt) && amt>0;
+    const phoneChanged = phone !== (m.telephone||'');
+    if(!hasAmt && !phoneChanged){ showToast('Entrez un montant à encaisser'); return; }
+    if(hasAmt) m.montant_verse += amt;
+    if(phoneChanged) m.telephone = phone;
     saveKey('members', members, true);
-    sessionLog.push({nom:`${m.prenom} ${m.nom}`, montant:amt, time:new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})});
+    if(hasAmt) sessionLog.push({nom:`${m.prenom} ${m.nom}`, montant:amt, time:new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})});
+    showToast(hasAmt ? 'Versement enregistré' : 'Téléphone mis à jour');
     encSelectedId=null; encQuery='';
     renderEncaissement(panel);
   };
@@ -948,6 +955,7 @@ function renderCotSubpanel(){
       <input type="text" id="nf-prenom" placeholder="Prénom(s)"/>
       <input type="text" id="nf-nom" placeholder="Nom"/>
       <input type="number" id="nf-attendu" placeholder="Montant attendu" value="${cat.base}"/>
+      <input type="tel" id="nf-telephone" placeholder="Téléphone (optionnel)"/>
       <button class="btn primary" id="saveNewBtn">Enregistrer</button>
       <button class="btn ghost" id="cancelNewBtn">Annuler</button>
     </div>` : ''}
@@ -968,9 +976,10 @@ function renderCotSubpanel(){
       const prenom = document.getElementById('nf-prenom').value.trim();
       const nom = document.getElementById('nf-nom').value.trim();
       const attendu = parseInt(document.getElementById('nf-attendu').value) || cat.base;
+      const telephone = document.getElementById('nf-telephone').value.trim();
       if(!prenom){ showToast('Le prénom est obligatoire'); return; }
       const maxId = members.reduce((a,m)=>Math.max(a,m.id),0);
-      members.push({id:maxId+1, categorie:cat.key, base:cat.base, prenom, nom, montant_attendu:attendu, montant_verse:0, historique:{}, observation:'', bus:''});
+      members.push({id:maxId+1, categorie:cat.key, base:cat.base, prenom, nom, montant_attendu:attendu, montant_verse:0, historique:{}, observation:'', bus:'', telephone});
       addFormOpen=false; saveKey('members', members, true); renderCotSubpanel();
     };
     const cancelNewBtn = document.getElementById('cancelNewBtn');
@@ -998,7 +1007,7 @@ function renderMemberRow(m, i){
     <div class="field f-verse"><div class="l">Versé</div>${verseCell}</div>
     <div class="field f-reste"><div class="l">Reste</div><div class="v num">${fmt(reste)}</div></div>
     <span class="badge ${st}">${badgeLabel}</span>
-    ${m.observation || m.bus ? `<div class="obs">${[m.bus?('Bus: '+m.bus):null, m.observation].filter(Boolean).join(' · ')}</div>` : ''}
+    ${m.observation || m.bus || m.telephone ? `<div class="obs">${[m.bus?('Bus: '+m.bus):null, m.telephone?('Tél: '+m.telephone):null, m.observation].filter(Boolean).join(' · ')}</div>` : ''}
   </div>`;
 }
 
@@ -1260,6 +1269,26 @@ function formatDateFr(iso){
   if(isNaN(d.getTime())) return '';
   return d.toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
 }
+function normalizePhone(raw){
+  if(!raw) return '';
+  let p = raw.replace(/[^\d+]/g,'');
+  if(p.startsWith('00')) p = '+'+p.slice(2);
+  if(!p.startsWith('+')){
+    if(/^7\d{8}$/.test(p)) p = '221'+p;          // local Senegalese mobile, no leading 0
+    else if(/^221\d{9}$/.test(p)) p = p;          // already has country code
+    else p = p.replace(/^\+/,'');
+  } else {
+    p = p.slice(1);
+  }
+  return p;
+}
+function busWhatsAppLink(v, b){
+  const phone = normalizePhone(v.telephone);
+  if(!phone) return null;
+  const dateLabel = busTransport.date_depart ? formatDateFr(busTransport.date_depart) : 'date à confirmer';
+  const msg = `Bonjour ${v.nom}, vous êtes inscrit(e) sur ${b.nom} pour le Maouloud 2026 à Barobé Diackel. Départ : ${busTransport.depart} → ${busTransport.destination}, le ${dateLabel}. Merci d'arriver 30 minutes avant le départ.`;
+  return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+}
 function renderBus(panel){
   const dateLabel = busTransport.date_depart ? formatDateFr(busTransport.date_depart) : 'Date non encore fixée';
   const atMax = buses.length >= MAX_BUSES;
@@ -1349,7 +1378,7 @@ function renderBusCard(b){
   const occ = busOccupants(b.id);
   const over = occ.length>b.capacite;
   const pct = b.capacite>0 ? Math.min(100, Math.round((occ.length/b.capacite)*100)) : 0;
-  const vf = voyForm[b.id] || {open:false, isMember:true, memberQuery:'', memberId:null};
+  const vf = voyForm[b.id] || {open:false, isMember:true, memberQuery:'', memberId:null, telephone:''};
   const capCell = role==='comite'
     ? `<input type="number" class="bus-cap-input" data-id="${b.id}" value="${b.capacite}" min="0" max="${MAX_CAPACITE}" style="width:64px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:center;"/>`
     : `${b.capacite}`;
@@ -1365,14 +1394,21 @@ function renderBusCard(b){
       <div class="occ-bar"><div class="occ-fill ${over?'over':''}" style="width:${pct}%"></div></div>
       ${over ? `<div class="badge neg" style="margin-bottom:8px;">Complet — sureffectif</div>` : ''}
       <div class="voy-list">
-        ${occ.length===0 ? `<div class="empty" style="padding:10px;">Aucun voyageur inscrit.</div>` : occ.map(v=>`
-          <div class="voy-item">
+        ${occ.length===0 ? `<div class="empty" style="padding:10px;">Aucun voyageur inscrit.</div>` : occ.map(v=>{
+          const waLink = busWhatsAppLink(v, b);
+          return `
+          <div class="voy-item" style="flex-wrap:wrap;gap:6px;">
             <span>${v.nom}</span>
-            <span style="display:flex;align-items:center;gap:6px;">
+            <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
               <span class="tag ${v.est_membre?'':'nonmember'}">${v.est_membre?'Membre':'Non-membre'}</span>
+              ${role==='comite'
+                ? `<input type="tel" class="voy-phone-input" data-voyphone="${v.id}" placeholder="Téléphone" value="${v.telephone||''}" style="width:118px;padding:4px 7px;border-radius:6px;border:1px solid var(--line);font-size:11px;font-family:inherit;"/>`
+                : (v.telephone ? `<span class="cat-badge">${v.telephone}</span>` : '')}
+              ${waLink ? `<a class="btn sm" href="${waLink}" target="_blank" rel="noopener" style="padding:4px 9px;font-size:11px;background:#25D366;color:#fff;border:none;text-decoration:none;">WhatsApp</a>` : ''}
               ${role==='comite' ? `<button class="btn danger-ghost" data-delvoy="${v.id}">×</button>` : ''}
             </span>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>
       ${role==='comite' ? `
       <div style="margin-top:10px;">
@@ -1385,6 +1421,7 @@ function renderBusCard(b){
           ${vf.isMember
             ? `<input type="text" data-voymember="${b.id}" placeholder="Rechercher un membre..." value="${vf.memberQuery||''}"/>`
             : `<input type="text" data-voyname="${b.id}" placeholder="Nom du voyageur"/>`}
+          <input type="tel" data-voynewphone="${b.id}" placeholder="Téléphone (optionnel)" value="${vf.telephone||''}"/>
           <button class="btn primary sm" data-voysave="${b.id}">Ajouter</button>
         </div>
         ${vf.open && vf.isMember && vf.memberQuery && vf.memberQuery.trim() ? renderVoyMemberResults(b.id, vf) : ''}
@@ -1406,7 +1443,7 @@ function wireBusCards(panel){
   panel.querySelectorAll('[data-voyopen]').forEach(btn=>{
     btn.onclick = ()=>{
       const id = btn.dataset.voyopen;
-      voyForm[id] = voyForm[id] || {open:false, isMember:true, memberQuery:'', memberId:null};
+      voyForm[id] = voyForm[id] || {open:false, isMember:true, memberQuery:'', memberId:null, telephone:''};
       voyForm[id].open = !voyForm[id].open;
       renderBus(panel);
     };
@@ -1419,25 +1456,46 @@ function wireBusCards(panel){
       const el = panel.querySelector(`[data-voymember="${id}"]`); if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); } };
   });
   panel.querySelectorAll('[data-voypick]').forEach(el=>{
-    el.onclick = ()=>{ const id=el.dataset.voypick; voyForm[id].memberId = parseInt(el.dataset.mid); renderBus(panel); };
+    el.onclick = ()=>{
+      const id=el.dataset.voypick;
+      const mid = parseInt(el.dataset.mid);
+      voyForm[id].memberId = mid;
+      if(!voyForm[id].telephone){
+        const m = members.find(x=>x.id===mid);
+        if(m && m.telephone) voyForm[id].telephone = m.telephone;
+      }
+      renderBus(panel);
+    };
+  });
+  panel.querySelectorAll('[data-voynewphone]').forEach(inp=>{
+    inp.onchange = (e)=>{ const id=inp.dataset.voynewphone; voyForm[id].telephone = e.target.value.trim(); };
   });
   panel.querySelectorAll('[data-voysave]').forEach(btn=>{
     btn.onclick = ()=>{
       const busId = parseInt(btn.dataset.voysave);
       const vf = voyForm[busId];
+      const phone = (vf.telephone||'').trim();
       const maxId = voyageurs.reduce((a,x)=>Math.max(a,x.id),0);
       if(vf.isMember){
         if(!vf.memberId){ showToast('Sélectionnez un membre dans la liste'); return; }
         const m = members.find(x=>x.id===vf.memberId);
-        voyageurs.push({id:maxId+1, bus_id:busId, nom:`${m.prenom} ${m.nom}`, est_membre:true, membre_id:m.id, telephone:''});
+        voyageurs.push({id:maxId+1, bus_id:busId, nom:`${m.prenom} ${m.nom}`, est_membre:true, membre_id:m.id, telephone:phone});
       }else{
         const nameInput = panel.querySelector(`[data-voyname="${busId}"]`);
         const nom = nameInput.value.trim();
         if(!nom){ showToast('Le nom du voyageur est obligatoire'); return; }
-        voyageurs.push({id:maxId+1, bus_id:busId, nom, est_membre:false, membre_id:null, telephone:''});
+        voyageurs.push({id:maxId+1, bus_id:busId, nom, est_membre:false, membre_id:null, telephone:phone});
       }
-      voyForm[busId] = {open:false, isMember:true, memberQuery:'', memberId:null};
+      voyForm[busId] = {open:false, isMember:true, memberQuery:'', memberId:null, telephone:''};
       saveKey('voyageurs', voyageurs, true);
+      renderBus(panel);
+    };
+  });
+  panel.querySelectorAll('[data-voyphone]').forEach(inp=>{
+    inp.onchange = (e)=>{
+      const v = voyageurs.find(x=>x.id===parseInt(inp.dataset.voyphone));
+      v.telephone = e.target.value.trim();
+      saveKeyDebounced('voyageurs', voyageurs);
       renderBus(panel);
     };
   });
@@ -1470,11 +1528,58 @@ function moduleCheckboxes(idPrefix, checkedList){
       <input type="checkbox" id="${idPrefix}-${m}" data-module="${m}" ${checked.includes(m)?'checked':''}/> ${MODULE_LABELS[m]}
     </label>`).join('');
 }
+function downloadJSON(filename, obj){
+  const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function backupFilenameStamp(){
+  return new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+}
+function exportFullBackupJSON(){
+  const backup = {
+    app: 'Barobe Diackel — Maouloud 2026', generated_at: new Date().toISOString(),
+    members, mobilemoney, bonnesvolontes, donsnature, ziar, depenses, buses, voyageurs, bustransport: busTransport, synthese
+  };
+  downloadJSON(`barobe-diackel-sauvegarde-${backupFilenameStamp()}.json`, backup);
+  showToast('Sauvegarde JSON téléchargée');
+}
+function exportFullBackupExcel(){
+  const cotisRows = members.map(m=>{
+    const cat = CATEGORIES.find(c=>c.key===m.categorie);
+    return [cat?cat.label:m.categorie, m.prenom, m.nom||'', m.montant_attendu, m.montant_verse, Math.max(m.montant_attendu-m.montant_verse,0), statusOf(m)==='paid'?'Payé':statusOf(m)==='partial'?'Partiel':'Non payé', m.telephone||''];
+  });
+  const voyageurRows = [];
+  buses.forEach(b=>{ busOccupants(b.id).forEach(v=>{ voyageurRows.push([b.nom, v.nom, v.est_membre?'Membre':'Non-membre', v.telephone||'']); }); });
+  exportExcel(`barobe-diackel-sauvegarde-${backupFilenameStamp()}.xlsx`, [
+    {name:'Cotisations', headers:['Catégorie','Prénom','Nom','Attendu','Versé','Reste','Statut','Téléphone'], rows:cotisRows},
+    {name:'Wave-OM', headers:['Nom','Opérateur','Montant'], rows:mobilemoney.map(x=>[x.nom,x.operateur,x.montant])},
+    {name:'Bonnes volontés', headers:['Nom','Montant','Observation'], rows:bonnesvolontes.map(x=>[x.nom,x.montant,x.observation||''])},
+    {name:'Dons en nature', headers:['Donateur','Article'], rows:donsnature.map(x=>[x.donateur,x.article])},
+    {name:'Ziar', headers:['Nom','Montant','Observation'], rows:ziar.map(x=>[x.nom,x.montant,x.observation||''])},
+    {name:'Dépenses', headers:['Libellé','Responsable','Avancé','Justifié','Reliquat'], rows:depenses.map(x=>[x.libelle,x.responsable||'',x.avance,x.justifie,x.avance-x.justifie])},
+    {name:'Voyageurs', headers:['Bus','Nom','Statut','Téléphone'], rows:voyageurRows},
+  ]);
+  showToast('Sauvegarde Excel téléchargée');
+}
 function renderComptesContent(panel){
   panel.innerHTML = `
     <div class="panel">
       <h2>Comptes</h2>
       <p class="lede">Comptes nominatifs pour le comité, les collecteurs, et la consultation en lecture seule. Connexions et modifications sont tracées dans le journal ci-dessous.</p>
+
+      <div class="section-gap" style="margin-top:0;">
+        <h3 style="font-family:'Fraunces',serif;font-size:16px;color:var(--primary-dark);margin:0 0 8px;">Sauvegarde complète</h3>
+        <p class="lede" style="margin-bottom:10px;">Les données sont déjà conservées sur le disque du serveur (elles survivent aux redémarrages). Ces boutons vous donnent en plus une copie locale, utile en cas de coupure internet ou pour vérifier hors-ligne. À faire régulièrement le jour de l'événement.</p>
+        <div class="toolbar">
+          <button class="btn" id="backupExcelBtn">📊 Sauvegarde Excel (tout lire)</button>
+          <button class="btn" id="backupJsonBtn">💾 Sauvegarde JSON (restauration exacte)</button>
+        </div>
+      </div>
+
       <div class="toolbar"><button class="btn primary" id="userAddBtn">+ Créer un compte</button></div>
       <div class="addform ${userAddOpen?'open':''}" id="userAddForm" style="flex-direction:column;align-items:stretch;">
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -1537,6 +1642,8 @@ function renderComptesContent(panel){
       </div>
     </div>
   `;
+  document.getElementById('backupExcelBtn').onclick = ()=>exportFullBackupExcel();
+  document.getElementById('backupJsonBtn').onclick = ()=>exportFullBackupJSON();
   document.getElementById('userAddBtn').onclick = ()=>{ userAddOpen=!userAddOpen; renderComptesContent(panel); };
   const cancel = document.getElementById('userCancelBtn'); if(cancel) cancel.onclick = ()=>{ userAddOpen=false; renderComptesContent(panel); };
   const roleSelEl = document.getElementById('u-role');
