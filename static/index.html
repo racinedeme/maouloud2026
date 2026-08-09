@@ -501,11 +501,12 @@ async function saveKey(name, value, toast=true){
       body: JSON.stringify({value: JSON.stringify(value)})
     });
     if(!res.ok){
-      if(res.status===401){ showToast('Session expirée — reconnectez-vous'); currentUser=null; role='membre'; render(); return; }
+      if(res.status===401){ showToast('Session expirée — reconnectez-vous'); currentUser=null; role='membre'; render(); return false; }
       throw new Error('save failed');
     }
     if(toast) showToast('Enregistré');
-  }catch(e){ showToast("Erreur d'enregistrement"); }
+    return true;
+  }catch(e){ showToast("Échec de l'enregistrement — vérifiez la connexion et réessayez"); return false; }
 }
 let saveTimers = {};
 function saveKeyDebounced(name, value){
@@ -892,7 +893,7 @@ function renderEncaissement(panel){
   const confirmCloseBtn = document.getElementById('encConfirmClose');
   if(confirmCloseBtn) confirmCloseBtn.onclick = ()=>{ encConfirmation=null; encSelectedId=null; encQuery=''; renderEncaissement(panel); };
   const saveBtn = document.getElementById('encSave');
-  if(saveBtn) saveBtn.onclick = ()=>{
+  if(saveBtn) saveBtn.onclick = async ()=>{
     const m = members.find(x=>x.id===encSelectedId);
     const amtInput = document.getElementById('encAmount');
     const phoneInput = document.getElementById('encPhone');
@@ -901,15 +902,22 @@ function renderEncaissement(panel){
     const hasAmt = !isNaN(amt) && amt>0;
     const phoneChanged = phone !== (m.telephone||'');
     if(!hasAmt && !phoneChanged){ showToast('Entrez un montant à encaisser'); return; }
+    saveBtn.disabled = true; saveBtn.textContent = 'Enregistrement...';
+    const oldVerse = m.montant_verse, oldPhone = m.telephone;
     if(hasAmt) m.montant_verse += amt;
     if(phoneChanged) m.telephone = phone;
-    saveKey('members', members, true);
+    const ok = await saveKey('members', members, false);
+    if(!ok){
+      m.montant_verse = oldVerse; m.telephone = oldPhone;
+      saveBtn.disabled = false; saveBtn.textContent = 'Enregistrer';
+      return;
+    }
     if(hasAmt){
       sessionLog.push({nom:`${m.prenom} ${m.nom}`, montant:amt, time:new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})});
       encConfirmation = {prenom:m.prenom, nom:m.nom, telephone:m.telephone||'', montant:amt, reste:Math.max(m.montant_attendu-m.montant_verse,0)};
       encSelectedId=null; encQuery='';
     }else{
-      showToast('Téléphone mis à jour');
+      showToast('Téléphone mis à jour et enregistré');
       encSelectedId=null; encQuery='';
     }
     renderEncaissement(panel);
@@ -1007,17 +1015,26 @@ function renderCotSubpanel(){
       if(c && attInput) attInput.value = c.base;
     };
     const saveNewBtn = document.getElementById('saveNewBtn');
-    if(saveNewBtn) saveNewBtn.onclick = ()=>{
+    if(saveNewBtn) saveNewBtn.onclick = async ()=>{
       const prenom = document.getElementById('nf-prenom').value.trim();
       const nom = document.getElementById('nf-nom').value.trim();
       const targetCat = cat || CATEGORIES.find(c=>c.key===document.getElementById('nf-categorie').value) || CATEGORIES[0];
       const attendu = parseInt(document.getElementById('nf-attendu').value) || targetCat.base;
       const telephone = document.getElementById('nf-telephone').value.trim();
       if(!prenom){ showToast('Le prénom est obligatoire'); return; }
+      saveNewBtn.disabled = true; saveNewBtn.textContent = 'Enregistrement...';
       const maxId = members.reduce((a,m)=>Math.max(a,m.id),0);
-      members.push({id:maxId+1, categorie:targetCat.key, base:targetCat.base, prenom, nom, montant_attendu:attendu, montant_verse:0, historique:{}, observation:'', bus:'', telephone});
-      addFormOpen=false; saveKey('members', members, true); renderCotSubpanel();
-      showToast(`${prenom} ajouté(e) — ${targetCat.label}`);
+      const newMember = {id:maxId+1, categorie:targetCat.key, base:targetCat.base, prenom, nom, montant_attendu:attendu, montant_verse:0, historique:{}, observation:'', bus:'', telephone};
+      members.push(newMember);
+      const ok = await saveKey('members', members, false);
+      if(ok){
+        addFormOpen=false;
+        showToast(`${prenom} ajouté(e) et enregistré(e) — ${targetCat.label}`);
+        renderCotSubpanel();
+      }else{
+        members.pop();
+        saveNewBtn.disabled = false; saveNewBtn.textContent = 'Enregistrer';
+      }
     };
     const cancelNewBtn = document.getElementById('cancelNewBtn');
     if(cancelNewBtn) cancelNewBtn.onclick = ()=>{ addFormOpen=false; renderCotSubpanel(); };
@@ -1029,31 +1046,45 @@ function renderCotSubpanel(){
       };
     });
     document.querySelectorAll('.cat-switch').forEach(sel=>{
-      sel.onchange = (e)=>{
+      sel.onchange = async (e)=>{
         const id = parseInt(e.target.dataset.id);
         const m = members.find(x=>x.id===id);
         const newCat = CATEGORIES.find(c=>c.key===e.target.value);
         if(!m || !newCat) return;
+        const oldCategorie = m.categorie, oldBase = m.base, oldAttendu = m.montant_attendu;
         const oldCatLabel = (CATEGORIES.find(c=>c.key===m.categorie)||{}).label || m.categorie;
+        e.target.disabled = true;
         m.categorie = newCat.key;
         m.base = newCat.base;
         m.montant_attendu = newCat.base;
-        saveKey('members', members, true);
-        showToast(`${m.prenom} déplacé(e) de "${oldCatLabel}" vers "${newCat.label}" — nouveau montant attendu : ${fmt(newCat.base)} FCFA`);
-        renderCotSubpanel();
+        const ok = await saveKey('members', members, false);
+        if(ok){
+          showToast(`${m.prenom} déplacé(e) de "${oldCatLabel}" vers "${newCat.label}" — nouveau montant attendu : ${fmt(newCat.base)} FCFA`);
+          renderCotSubpanel();
+        }else{
+          m.categorie = oldCategorie; m.base = oldBase; m.montant_attendu = oldAttendu;
+          e.target.disabled = false; e.target.value = oldCategorie;
+        }
       };
     });
     document.querySelectorAll('[data-delmember]').forEach(btn=>{
-      btn.onclick = ()=>{
+      btn.onclick = async ()=>{
         const id = parseInt(btn.dataset.delmember);
         const m = members.find(x=>x.id===id);
         if(!m) return;
         const warn = m.montant_verse>0 ? `\n⚠️ Ce membre a déjà versé ${fmt(m.montant_verse)} FCFA — cette somme sera retirée du total encaissé.` : '';
         if(!confirm(`Supprimer définitivement ${m.prenom} ${m.nom||''} ?${warn}`)) return;
+        btn.disabled = true; btn.textContent = 'Suppression...';
+        const backup = members.slice();
         members = members.filter(x=>x.id!==id);
-        saveKey('members', members, true);
-        showToast('Membre supprimé');
-        renderCotSubpanel();
+        const ok = await saveKey('members', members, false);
+        if(ok){
+          showToast('Membre supprimé');
+          renderCotSubpanel();
+        }else{
+          members = backup;
+          btn.disabled = false; btn.textContent = 'Supprimer ce membre';
+        }
       };
     });
   }
