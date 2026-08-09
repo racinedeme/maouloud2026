@@ -235,7 +235,7 @@ let busTransport = {destination:'Barobé Diackel', date_depart:'', note:''};
 
 let role = 'membre';
 let mainTab = 'dashboard';
-let catTab = 'overview';
+let catTab = 'all';
 let searchQuery = '', statusFilter = 'all', sortByReste = false, addFormOpen = false;
 let encQuery = '', encSelectedId = null;
 let encConfirmation = null; // {prenom, nom, telephone, montant, reste} shown right after a payment is saved
@@ -934,7 +934,7 @@ function renderCotisationsModule(panel){
 }
 function renderCotSubtabs(){
   const el = document.getElementById('subtabs');
-  const tabs = [{key:'overview', label:"Vue d'ensemble"}].concat(CATEGORIES.map((c,i)=>({key:c.key, label:c.label, n:i+1})));
+  const tabs = [{key:'all', label:'Tous les membres'}, {key:'overview', label:"Vue d'ensemble"}].concat(CATEGORIES.map((c,i)=>({key:c.key, label:c.label, n:i+1})));
   el.innerHTML = tabs.map(t=>`<div class="subtab ${catTab===t.key?'active':''}" data-tab="${t.key}">${t.n?`<span class="n">${t.n}</span>`:''}${t.label}</div>`).join('');
   el.querySelectorAll('.subtab').forEach(e=>{ e.onclick=()=>{ catTab=e.dataset.tab; searchQuery=''; renderCotSubtabs(); renderCotSubpanel(); }; });
 }
@@ -954,16 +954,17 @@ function renderCotSubpanel(){
     sp.querySelectorAll('[data-goto]').forEach(e=>{ e.onclick=()=>{ catTab=e.dataset.goto; renderCotSubtabs(); renderCotSubpanel(); }; });
     return;
   }
-  const cat = CATEGORIES.find(c=>c.key===catTab);
-  const s = catStats(cat.key);
-  let list = members.filter(m=>m.categorie===cat.key);
+  const cat = catTab==='all' ? null : CATEGORIES.find(c=>c.key===catTab);
+  const s = cat ? catStats(cat.key) : globalCotisStats();
+  let list = cat ? members.filter(m=>m.categorie===cat.key) : members.slice();
   if(searchQuery.trim()){ const q=searchQuery.trim().toLowerCase(); list = list.filter(m=>(m.prenom+' '+m.nom).toLowerCase().includes(q)); }
   if(statusFilter!=='all') list = list.filter(m=>statusOf(m)===statusFilter);
   if(sortByReste) list = list.slice().sort((a,b)=>(b.montant_attendu-b.montant_verse)-(a.montant_attendu-a.montant_verse));
+  else if(!cat) list = list.slice().sort((a,b)=>(a.prenom+a.nom).localeCompare(b.prenom+b.nom, 'fr'));
 
   sp.innerHTML = `
     <div class="cat-head">
-      <div><h3>${cat.label}</h3><div class="base-amount">Montant de base : ${fmt(cat.base)} FCFA</div></div>
+      <div><h3>${cat ? cat.label : 'Tous les membres'}</h3><div class="base-amount">${cat ? `Montant de base : ${fmt(cat.base)} FCFA` : 'Toutes catégories confondues — ajout, modification, suppression'}</div></div>
       <div class="cat-stats"><span><b>${s.count}</b> membres</span><span><b class="num">${fmt(s.attendu)}</b> attendu</span><span><b class="num">${fmt(s.verse)}</b> collecté</span><span><b>${s.rate}%</b> taux</span></div>
     </div>
     <div class="toolbar">
@@ -981,13 +982,14 @@ function renderCotSubpanel(){
     ${role==='comite' ? `<div class="addform ${addFormOpen?'open':''}" id="addForm">
       <input type="text" id="nf-prenom" placeholder="Prénom(s)"/>
       <input type="text" id="nf-nom" placeholder="Nom"/>
-      <input type="number" id="nf-attendu" placeholder="Montant attendu" value="${cat.base}"/>
+      ${cat ? '' : `<select id="nf-categorie">${CATEGORIES.map(c=>`<option value="${c.key}">${c.label} (${fmt(c.base)})</option>`).join('')}</select>`}
+      <input type="number" id="nf-attendu" placeholder="Montant attendu" value="${cat?cat.base:CATEGORIES[0].base}"/>
       <input type="tel" id="nf-telephone" placeholder="Téléphone (optionnel)"/>
       <button class="btn primary" id="saveNewBtn">Enregistrer</button>
       <button class="btn ghost" id="cancelNewBtn">Annuler</button>
     </div>` : ''}
     <div class="mlist" id="mlist" style="margin-top:14px;">
-      ${list.length===0 ? `<div class="empty">Aucun membre ne correspond à cette recherche.</div>` : list.map((m,i)=>renderMemberRow(m,i)).join('')}
+      ${list.length===0 ? `<div class="empty">Aucun membre ne correspond à cette recherche.</div>` : list.map((m,i)=>renderMemberRow(m,i,!cat)).join('')}
     </div>
   `;
   document.getElementById('searchInput').oninput = (e)=>{ searchQuery=e.target.value; renderCotSubpanel();
@@ -998,16 +1000,24 @@ function renderCotSubpanel(){
   if(role==='comite'){
     const addBtn = document.getElementById('addBtn');
     if(addBtn) addBtn.onclick = ()=>{ addFormOpen=!addFormOpen; renderCotSubpanel(); };
+    const nfCatSelect = document.getElementById('nf-categorie');
+    if(nfCatSelect) nfCatSelect.onchange = (e)=>{
+      const c = CATEGORIES.find(x=>x.key===e.target.value);
+      const attInput = document.getElementById('nf-attendu');
+      if(c && attInput) attInput.value = c.base;
+    };
     const saveNewBtn = document.getElementById('saveNewBtn');
     if(saveNewBtn) saveNewBtn.onclick = ()=>{
       const prenom = document.getElementById('nf-prenom').value.trim();
       const nom = document.getElementById('nf-nom').value.trim();
-      const attendu = parseInt(document.getElementById('nf-attendu').value) || cat.base;
+      const targetCat = cat || CATEGORIES.find(c=>c.key===document.getElementById('nf-categorie').value) || CATEGORIES[0];
+      const attendu = parseInt(document.getElementById('nf-attendu').value) || targetCat.base;
       const telephone = document.getElementById('nf-telephone').value.trim();
       if(!prenom){ showToast('Le prénom est obligatoire'); return; }
       const maxId = members.reduce((a,m)=>Math.max(a,m.id),0);
-      members.push({id:maxId+1, categorie:cat.key, base:cat.base, prenom, nom, montant_attendu:attendu, montant_verse:0, historique:{}, observation:'', bus:'', telephone});
+      members.push({id:maxId+1, categorie:targetCat.key, base:targetCat.base, prenom, nom, montant_attendu:attendu, montant_verse:0, historique:{}, observation:'', bus:'', telephone});
       addFormOpen=false; saveKey('members', members, true); renderCotSubpanel();
+      showToast(`${prenom} ajouté(e) — ${targetCat.label}`);
     };
     const cancelNewBtn = document.getElementById('cancelNewBtn');
     if(cancelNewBtn) cancelNewBtn.onclick = ()=>{ addFormOpen=false; renderCotSubpanel(); };
@@ -1048,16 +1058,17 @@ function renderCotSubpanel(){
     });
   }
 }
-function renderMemberRow(m, i){
+function renderMemberRow(m, i, showCat){
   const st = statusOf(m);
   const badgeLabel = st==='paid'?'Payé':st==='partial'?'Partiel':'Non payé';
   const reste = Math.max(m.montant_attendu-m.montant_verse,0);
   const verseCell = role==='comite'
     ? `<input type="number" class="verse-input" data-id="${m.id}" value="${m.montant_verse}" min="0"/>`
     : `<div class="v num">${fmt(m.montant_verse)}</div>`;
+  const catLabel = showCat ? ((CATEGORIES.find(c=>c.key===m.categorie)||{}).label || m.categorie) : null;
   return `<div class="mrow cot">
     <div class="idx num">${i+1}</div>
-    <div class="name">${m.prenom} ${m.nom||''}</div>
+    <div class="name">${m.prenom} ${m.nom||''}${catLabel ? `<div class="cat-badge">${catLabel}</div>` : ''}</div>
     <div class="field f-attendu"><div class="l">Attendu</div><div class="v num">${fmt(m.montant_attendu)}</div></div>
     <div class="field f-verse"><div class="l">Versé</div>${verseCell}</div>
     <div class="field f-reste"><div class="l">Reste</div><div class="v num">${fmt(reste)}</div></div>
