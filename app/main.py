@@ -363,6 +363,21 @@ def require_admin(request: Request) -> dict:
 app = FastAPI(title="Maouloud 2026 API")
 
 
+@app.middleware("http")
+async def no_cache_app_shell(request: Request, call_next):
+    """The app shell (index.html, served at '/') must never be cached by the
+    browser's HTTP cache — this app is redeployed frequently, and a stale
+    cached shell would keep showing an outdated version indefinitely even
+    after a successful deploy. Static assets (icons, manifest) are unaffected."""
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.endswith(".html") or path == "/service-worker.js":
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 class LoginBody(BaseModel):
     username: str
     password: str
