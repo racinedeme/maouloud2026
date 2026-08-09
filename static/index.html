@@ -494,6 +494,38 @@ async function loadKey(name, seed){
   }catch(e){}
   return JSON.parse(JSON.stringify(seed));
 }
+
+/* Fetch the absolute freshest copy from the server right now, with no seed
+   fallback — returns null on failure so callers can safely abort a write
+   rather than risk saving a guessed/stale value over someone else's data.
+   Used by saveCollectionSafely() to avoid the "lost update" problem: with
+   several collectors on different devices editing the same list (members,
+   voyageurs...), saving a locally-held copy can silently overwrite and erase
+   changes another device made in the meantime. Fetching fresh immediately
+   before every write shrinks that risk window from "however long since this
+   device last loaded the page" down to a few hundred milliseconds. */
+async function loadFreshKey(name){
+  try{
+    const res = await fetch('/api/store/'+STORAGE_KEYS[name]);
+    if(res.ok){ const j = await res.json(); return JSON.parse(j.value); }
+  }catch(e){}
+  return null;
+}
+
+/* Safely mutate a shared collection (members, voyageurs, ...): fetches the
+   freshest server copy, applies mutateFn to it (mutateFn receives the fresh
+   array and returns the updated array), saves the result, and — only on
+   success — returns {ok:true, data:updatedArray} so the caller can update
+   its local state to match exactly what was persisted. On any failure
+   (fetch or save), returns {ok:false, data:null} and touches nothing. */
+async function saveCollectionSafely(name, mutateFn){
+  const fresh = await loadFreshKey(name);
+  if(fresh===null){ showToast('Impossible de récupérer les données à jour — réessayez'); return {ok:false, data:null}; }
+  const updated = mutateFn(fresh);
+  const ok = await saveKey(name, updated, false);
+  return ok ? {ok:true, data:updated} : {ok:false, data:null};
+}
+
 async function saveKey(name, value, toast=true){
   try{
     const res = await fetch('/api/store/'+STORAGE_KEYS[name], {
@@ -894,27 +926,34 @@ function renderEncaissement(panel){
   if(confirmCloseBtn) confirmCloseBtn.onclick = ()=>{ encConfirmation=null; encSelectedId=null; encQuery=''; renderEncaissement(panel); };
   const saveBtn = document.getElementById('encSave');
   if(saveBtn) saveBtn.onclick = async ()=>{
-    const m = members.find(x=>x.id===encSelectedId);
+    const localM = members.find(x=>x.id===encSelectedId);
     const amtInput = document.getElementById('encAmount');
     const phoneInput = document.getElementById('encPhone');
     const phone = phoneInput.value.trim();
     let amt = parseInt(amtInput.value);
     const hasAmt = !isNaN(amt) && amt>0;
-    const phoneChanged = phone !== (m.telephone||'');
+    const phoneChanged = phone !== (localM.telephone||'');
     if(!hasAmt && !phoneChanged){ showToast('Entrez un montant à encaisser'); return; }
     saveBtn.disabled = true; saveBtn.textContent = 'Enregistrement...';
-    const oldVerse = m.montant_verse, oldPhone = m.telephone;
-    if(hasAmt) m.montant_verse += amt;
-    if(phoneChanged) m.telephone = phone;
-    const ok = await saveKey('members', members, false);
-    if(!ok){
-      m.montant_verse = oldVerse; m.telephone = oldPhone;
+    let finalReste = 0, finalPhone = localM.telephone||'';
+    const result = await saveCollectionSafely('members', (fresh)=>{
+      const fm = fresh.find(x=>x.id===encSelectedId);
+      if(fm){
+        if(hasAmt) fm.montant_verse += amt;
+        if(phoneChanged) fm.telephone = phone;
+        finalReste = Math.max(fm.montant_attendu-fm.montant_verse,0);
+        finalPhone = fm.telephone||'';
+      }
+      return fresh;
+    });
+    if(!result.ok){
       saveBtn.disabled = false; saveBtn.textContent = 'Enregistrer';
       return;
     }
+    members = result.data;
     if(hasAmt){
-      sessionLog.push({nom:`${m.prenom} ${m.nom}`, montant:amt, time:new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})});
-      encConfirmation = {prenom:m.prenom, nom:m.nom, telephone:m.telephone||'', montant:amt, reste:Math.max(m.montant_attendu-m.montant_verse,0)};
+      sessionLog.push({nom:`${localM.prenom} ${localM.nom}`, montant:amt, time:new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})});
+      encConfirmation = {prenom:localM.prenom, nom:localM.nom, telephone:finalPhone, montant:amt, reste:finalReste};
       encSelectedId=null; encQuery='';
     }else{
       showToast('Téléphone mis à jour et enregistré');
@@ -1023,46 +1062,55 @@ function renderCotSubpanel(){
       const telephone = document.getElementById('nf-telephone').value.trim();
       if(!prenom){ showToast('Le prénom est obligatoire'); return; }
       saveNewBtn.disabled = true; saveNewBtn.textContent = 'Enregistrement...';
-      const maxId = members.reduce((a,m)=>Math.max(a,m.id),0);
-      const newMember = {id:maxId+1, categorie:targetCat.key, base:targetCat.base, prenom, nom, montant_attendu:attendu, montant_verse:0, historique:{}, observation:'', bus:'', telephone};
-      members.push(newMember);
-      const ok = await saveKey('members', members, false);
-      if(ok){
+      const result = await saveCollectionSafely('members', (fresh)=>{
+        const maxId = fresh.reduce((a,m)=>Math.max(a,m.id),0);
+        fresh.push({id:maxId+1, categorie:targetCat.key, base:targetCat.base, prenom, nom, montant_attendu:attendu, montant_verse:0, historique:{}, observation:'', bus:'', telephone});
+        return fresh;
+      });
+      if(result.ok){
+        members = result.data;
         addFormOpen=false;
         showToast(`${prenom} ajouté(e) et enregistré(e) — ${targetCat.label}`);
         renderCotSubpanel();
       }else{
-        members.pop();
         saveNewBtn.disabled = false; saveNewBtn.textContent = 'Enregistrer';
       }
     };
     const cancelNewBtn = document.getElementById('cancelNewBtn');
     if(cancelNewBtn) cancelNewBtn.onclick = ()=>{ addFormOpen=false; renderCotSubpanel(); };
     document.querySelectorAll('.verse-input').forEach(inp=>{
-      inp.onchange = (e)=>{
-        const id = parseInt(e.target.dataset.id); const m = members.find(x=>x.id===id);
+      inp.onchange = async (e)=>{
+        const id = parseInt(e.target.dataset.id);
         let v = parseInt(e.target.value); if(isNaN(v)||v<0) v=0;
-        m.montant_verse=v; saveKeyDebounced('members', members); renderCotSubpanel();
+        e.target.disabled = true;
+        const result = await saveCollectionSafely('members', (fresh)=>{
+          const fm = fresh.find(x=>x.id===id);
+          if(fm) fm.montant_verse = v;
+          return fresh;
+        });
+        if(result.ok){ members = result.data; renderCotSubpanel(); }
+        else{ e.target.disabled = false; }
       };
     });
     document.querySelectorAll('.cat-switch').forEach(sel=>{
       sel.onchange = async (e)=>{
         const id = parseInt(e.target.dataset.id);
-        const m = members.find(x=>x.id===id);
         const newCat = CATEGORIES.find(c=>c.key===e.target.value);
-        if(!m || !newCat) return;
-        const oldCategorie = m.categorie, oldBase = m.base, oldAttendu = m.montant_attendu;
-        const oldCatLabel = (CATEGORIES.find(c=>c.key===m.categorie)||{}).label || m.categorie;
+        if(!newCat) return;
+        const localM = members.find(x=>x.id===id);
+        const oldCategorie = localM ? localM.categorie : e.target.dataset.prevValue;
+        const oldCatLabel = (CATEGORIES.find(c=>c.key===oldCategorie)||{}).label || oldCategorie;
         e.target.disabled = true;
-        m.categorie = newCat.key;
-        m.base = newCat.base;
-        m.montant_attendu = newCat.base;
-        const ok = await saveKey('members', members, false);
-        if(ok){
-          showToast(`${m.prenom} déplacé(e) de "${oldCatLabel}" vers "${newCat.label}" — nouveau montant attendu : ${fmt(newCat.base)} FCFA`);
+        const result = await saveCollectionSafely('members', (fresh)=>{
+          const fm = fresh.find(x=>x.id===id);
+          if(fm){ fm.categorie = newCat.key; fm.base = newCat.base; fm.montant_attendu = newCat.base; }
+          return fresh;
+        });
+        if(result.ok){
+          members = result.data;
+          showToast(`${(members.find(x=>x.id===id)||{}).prenom||''} déplacé(e) de "${oldCatLabel}" vers "${newCat.label}" — nouveau montant attendu : ${fmt(newCat.base)} FCFA`);
           renderCotSubpanel();
         }else{
-          m.categorie = oldCategorie; m.base = oldBase; m.montant_attendu = oldAttendu;
           e.target.disabled = false; e.target.value = oldCategorie;
         }
       };
@@ -1075,14 +1123,12 @@ function renderCotSubpanel(){
         const warn = m.montant_verse>0 ? `\n⚠️ Ce membre a déjà versé ${fmt(m.montant_verse)} FCFA — cette somme sera retirée du total encaissé.` : '';
         if(!confirm(`Supprimer définitivement ${m.prenom} ${m.nom||''} ?${warn}`)) return;
         btn.disabled = true; btn.textContent = 'Suppression...';
-        const backup = members.slice();
-        members = members.filter(x=>x.id!==id);
-        const ok = await saveKey('members', members, false);
-        if(ok){
+        const result = await saveCollectionSafely('members', (fresh)=> fresh.filter(x=>x.id!==id));
+        if(result.ok){
+          members = result.data;
           showToast('Membre supprimé');
           renderCotSubpanel();
         }else{
-          members = backup;
           btn.disabled = false; btn.textContent = 'Supprimer ce membre';
         }
       };
