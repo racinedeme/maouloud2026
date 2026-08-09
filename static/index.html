@@ -1018,6 +1018,34 @@ function renderCotSubpanel(){
         m.montant_verse=v; saveKeyDebounced('members', members); renderCotSubpanel();
       };
     });
+    document.querySelectorAll('.cat-switch').forEach(sel=>{
+      sel.onchange = (e)=>{
+        const id = parseInt(e.target.dataset.id);
+        const m = members.find(x=>x.id===id);
+        const newCat = CATEGORIES.find(c=>c.key===e.target.value);
+        if(!m || !newCat) return;
+        const oldCatLabel = (CATEGORIES.find(c=>c.key===m.categorie)||{}).label || m.categorie;
+        m.categorie = newCat.key;
+        m.base = newCat.base;
+        m.montant_attendu = newCat.base;
+        saveKey('members', members, true);
+        showToast(`${m.prenom} déplacé(e) de "${oldCatLabel}" vers "${newCat.label}" — nouveau montant attendu : ${fmt(newCat.base)} FCFA`);
+        renderCotSubpanel();
+      };
+    });
+    document.querySelectorAll('[data-delmember]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const id = parseInt(btn.dataset.delmember);
+        const m = members.find(x=>x.id===id);
+        if(!m) return;
+        const warn = m.montant_verse>0 ? `\n⚠️ Ce membre a déjà versé ${fmt(m.montant_verse)} FCFA — cette somme sera retirée du total encaissé.` : '';
+        if(!confirm(`Supprimer définitivement ${m.prenom} ${m.nom||''} ?${warn}`)) return;
+        members = members.filter(x=>x.id!==id);
+        saveKey('members', members, true);
+        showToast('Membre supprimé');
+        renderCotSubpanel();
+      };
+    });
   }
 }
 function renderMemberRow(m, i){
@@ -1035,6 +1063,13 @@ function renderMemberRow(m, i){
     <div class="field f-reste"><div class="l">Reste</div><div class="v num">${fmt(reste)}</div></div>
     <span class="badge ${st}">${badgeLabel}</span>
     ${m.observation || m.bus || m.telephone ? `<div class="obs">${[m.bus?('Bus: '+m.bus):null, m.telephone?('Tél: '+m.telephone):null, m.observation].filter(Boolean).join(' · ')}</div>` : ''}
+    ${role==='comite' ? `<div class="cat-switch-row" style="grid-column:1/-1;display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap;">
+      <label style="font-size:11px;color:var(--ink-soft);">Catégorie :</label>
+      <select class="cat-switch" data-id="${m.id}" style="font-size:11.5px;padding:3px 6px;border-radius:6px;border:1px solid var(--line);font-family:inherit;">
+        ${CATEGORIES.map(c=>`<option value="${c.key}" ${c.key===m.categorie?'selected':''}>${c.label} (${fmt(c.base)})</option>`).join('')}
+      </select>
+      <button class="btn danger-ghost sm" data-delmember="${m.id}" style="margin-left:auto;">Supprimer ce membre</button>
+    </div>` : ''}
   </div>`;
 }
 
