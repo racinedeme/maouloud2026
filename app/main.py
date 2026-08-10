@@ -54,16 +54,16 @@ STORAGE_KEYS = {
 # Encaissement and Cotisations screens). Keys not listed here (e.g. the
 # dashboard's "synthese" report_caisse) are writable by any admin/collecteur
 # regardless of per-module permissions.
-MODULES = ["encaissement", "cotisations", "mobilemoney", "bonnesvolontes", "ziar", "depenses", "bus"]
+MODULES = ["encaissement", "cotisations", "fiches", "mobilemoney", "bonnesvolontes", "ziar", "depenses", "bus"]
 STORAGE_KEY_TO_MODULES = {
-    "maouloud2026-members": ["encaissement", "cotisations"],
+    "maouloud2026-members": ["encaissement", "cotisations", "fiches"],
     "maouloud2026-mobilemoney": ["mobilemoney"],
     "maouloud2026-bonnesvolontes": ["bonnesvolontes"],
     "maouloud2026-donsnature": ["bonnesvolontes"],
     "maouloud2026-ziar": ["ziar"],
     "maouloud2026-depenses": ["depenses"],
     "maouloud2026-buses": ["bus"],
-    "maouloud2026-voyageurs": ["bus"],
+    "maouloud2026-voyageurs": ["bus", "fiches"],
     "maouloud2026-bustransport": ["bus"],
 }
 

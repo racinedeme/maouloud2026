@@ -259,9 +259,9 @@ if(desiredKioskTab) mainTab = desiredKioskTab;
    jamais accès en écriture. Un compte collecteur avec une liste de
    permissions vide est non restreint (comportement historique) ; avec
    une liste non vide, seuls les modules cochés sont accessibles. */
-const GATED_MODULES = ['encaissement','cotisations','mobilemoney','bonnesvolontes','ziar','depenses','bus'];
+const GATED_MODULES = ['encaissement','cotisations','fiches','mobilemoney','bonnesvolontes','ziar','depenses','bus'];
 const MODULE_LABELS = {
-  encaissement:'Encaissement', cotisations:'Cotisations', mobilemoney:'Wave / Orange Money',
+  encaissement:'Encaissement', cotisations:'Cotisations', fiches:'Fiches membres', mobilemoney:'Wave / Orange Money',
   bonnesvolontes:'Bonnes volontés', ziar:'Ziar', depenses:'Dépenses', bus:'Bus & voyageurs'
 };
 const STORAGE_KEY_LABELS = {
@@ -601,6 +601,7 @@ const MAIN_TABS = [
   {key:'dashboard', label:'Tableau de bord', roles:['comite','membre']},
   {key:'encaissement', label:'Encaissement', roles:['comite']},
   {key:'cotisations', label:'Cotisations', roles:['comite','membre']},
+  {key:'fiches', label:'Fiches membres', roles:['comite']},
   {key:'mobilemoney', label:'Wave / Orange Money', roles:['comite','membre']},
   {key:'bonnesvolontes', label:'Bonnes volontés', roles:['comite','membre']},
   {key:'ziar', label:'Ziar', roles:['comite','membre']},
@@ -734,6 +735,7 @@ function render(){
   if(mainTab==='dashboard') renderDashboard(panel);
   else if(mainTab==='encaissement') renderEncaissement(panel);
   else if(mainTab==='cotisations') renderCotisationsModule(panel);
+  else if(mainTab==='fiches') renderFiches(panel);
   else if(mainTab==='mobilemoney') renderMobileMoney(panel);
   else if(mainTab==='bonnesvolontes') renderBonnesVolontes(panel);
   else if(mainTab==='ziar') renderZiar(panel);
@@ -1149,15 +1151,24 @@ function renderCotSubpanel(){
     wireFicheMembre(panel, renderCotSubpanel);
   }
 }
-function ficheMembreHtml(m){
-  return `<button class="btn sm ghost" data-fichetoggle="${m.id}">${memberFicheOpen[m.id]?'Fermer la fiche':'📇 Fiche membre'}</button>
-    ${memberFicheOpen[m.id] ? `<div class="addform open" style="flex-basis:100%;flex-direction:column;align-items:stretch;margin-top:6px;">
+function ficheMembreHtml(m, forceOpen){
+  const isOpen = forceOpen || memberFicheOpen[m.id];
+  const currentVoy = voyageurs.find(v=>v.est_membre && v.membre_id===m.id);
+  const currentBusId = currentVoy ? currentVoy.bus_id : '';
+  return `${forceOpen ? '' : `<button class="btn sm ghost" data-fichetoggle="${m.id}">${memberFicheOpen[m.id]?'Fermer la fiche':'📇 Fiche membre'}</button>`}
+    ${isOpen ? `<div class="addform open" style="flex-basis:100%;flex-direction:column;align-items:stretch;margin-top:6px;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <input type="text" class="fiche-prenom" data-id="${m.id}" placeholder="Prénom(s)" value="${m.prenom}" style="flex:1;min-width:120px;"/>
         <input type="text" class="fiche-nom" data-id="${m.id}" placeholder="Nom" value="${m.nom||''}" style="flex:1;min-width:120px;"/>
         <input type="tel" class="fiche-telephone" data-id="${m.id}" placeholder="Téléphone" value="${m.telephone||''}" style="flex:1;min-width:120px;"/>
       </div>
-      <input type="text" class="fiche-adresse" data-id="${m.id}" placeholder="Adresse" value="${m.adresse||''}" style="margin-top:8px;"/>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+        <input type="text" class="fiche-adresse" data-id="${m.id}" placeholder="Adresse" value="${m.adresse||''}" style="flex:2;min-width:160px;"/>
+        <select class="fiche-bus" data-id="${m.id}" style="flex:1;min-width:130px;padding:9px 10px;border-radius:9px;border:1px solid var(--line);font-family:inherit;font-size:13px;">
+          <option value="">Aucun bus</option>
+          ${buses.map(b=>`<option value="${b.id}" ${String(currentBusId)===String(b.id)?'selected':''}>${b.nom}</option>`).join('')}
+        </select>
+      </div>
       <textarea class="fiche-memo" data-id="${m.id}" placeholder="Mémo (notes internes sur ce membre)" rows="2" style="margin-top:8px;padding:9px 12px;border-radius:9px;border:1px solid var(--line);font-family:inherit;font-size:13px;resize:vertical;">${m.memo||''}</textarea>
       <div style="margin-top:8px;"><button class="btn primary sm" data-fichesave="${m.id}">Enregistrer la fiche</button></div>
     </div>` : ''}`;
@@ -1178,6 +1189,8 @@ function wireFicheMembre(panel, rerender){
       const telephone = panel.querySelector(`.fiche-telephone[data-id="${id}"]`).value.trim();
       const adresse = panel.querySelector(`.fiche-adresse[data-id="${id}"]`).value.trim();
       const memo = panel.querySelector(`.fiche-memo[data-id="${id}"]`).value.trim();
+      const busSel = panel.querySelector(`.fiche-bus[data-id="${id}"]`);
+      const busId = busSel.value ? parseInt(busSel.value) : null;
       if(!prenom){ showToast('Le prénom est obligatoire'); return; }
       btn.disabled = true; btn.textContent = 'Enregistrement...';
       const result = await saveCollectionSafely('members', (fresh)=>{
@@ -1185,16 +1198,70 @@ function wireFicheMembre(panel, rerender){
         if(x){ x.prenom=prenom; x.nom=nom; x.telephone=telephone; x.adresse=adresse; x.memo=memo; }
         return fresh;
       });
-      if(result.ok){
-        members = result.data;
+      if(!result.ok){ btn.disabled = false; btn.textContent = 'Enregistrer la fiche'; return; }
+      members = result.data;
+
+      const voyResult = await saveCollectionSafely('voyageurs', (fresh)=>{
+        const existing = fresh.find(v=>v.est_membre && v.membre_id===id);
+        if(busId===null){
+          return fresh.filter(v=>!(v.est_membre && v.membre_id===id));
+        }else if(existing){
+          existing.bus_id = busId; existing.nom = `${prenom} ${nom}`.trim(); existing.telephone = telephone;
+          return fresh;
+        }else{
+          const maxId = fresh.reduce((a,v)=>Math.max(a,v.id),0);
+          fresh.push({id:maxId+1, bus_id:busId, nom:`${prenom} ${nom}`.trim(), est_membre:true, membre_id:id, telephone});
+          return fresh;
+        }
+      });
+      if(voyResult.ok){
+        voyageurs = voyResult.data;
         memberFicheOpen[id] = false;
         showToast('Fiche enregistrée');
         rerender();
       }else{
+        showToast("Fiche membre enregistrée, mais l'affectation au bus a échoué — réessayez");
         btn.disabled = false; btn.textContent = 'Enregistrer la fiche';
       }
     };
   });
+}
+let fichesSearchQuery = '';
+function renderFiches(panel){
+  const q = fichesSearchQuery.trim().toLowerCase();
+  const qDigits = fichesSearchQuery.replace(/[^\d]/g,'');
+  let list = members;
+  if(q){
+    list = members.filter(m=>
+      (m.prenom+' '+m.nom).toLowerCase().includes(q) ||
+      (qDigits.length>=3 && (m.telephone||'').replace(/[^\d]/g,'').includes(qDigits))
+    );
+  }
+  panel.innerHTML = `
+    <div class="panel">
+      <h2>Fiches membres</h2>
+      <p class="lede">Coordonnées, adresse, mémo et affectation bus — aucune donnée financière n'apparaît dans cet onglet.</p>
+      <div class="toolbar">
+        <div class="search-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="fichesSearch" placeholder="Nom, prénom ou téléphone..." value="${fichesSearchQuery}"/></div>
+      </div>
+      <div class="mlist" style="margin-top:14px;">
+        ${list.length===0 ? `<div class="empty">Aucun membre ne correspond à cette recherche.</div>` : list.map((m,i)=>`
+          <div class="mrow" style="grid-template-columns:28px 1fr;">
+            <div class="idx num">${i+1}</div>
+            <div>
+              <div class="name">${m.prenom} ${m.nom||''}</div>
+              <div style="margin-top:6px;">${ficheMembreHtml(m, true)}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  const searchInput = document.getElementById('fichesSearch');
+  searchInput.oninput = (e)=>{ fichesSearchQuery = e.target.value; renderFiches(panel);
+    const el = document.getElementById('fichesSearch'); el.focus(); el.setSelectionRange(fichesSearchQuery.length, fichesSearchQuery.length); };
+  wireFicheMembre(panel, ()=>renderFiches(panel));
 }
 function renderMemberRow(m, i, showCat){
   const st = statusOf(m);
