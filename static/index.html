@@ -760,7 +760,7 @@ function renderDashboard(panel){
         <div class="kpi-card alt"><div class="v num">${s.gs.rate}%</div><div class="l">Taux de recouvrement cotisations</div></div>
       </div>
 
-      ${role==='membre' ? renderSelfLookup() : ''}
+      ${renderSelfLookup()}
 
       <table class="synth-table">
         <tr><td class="lbl">Report caisse (année précédente)</td><td class="val num">
@@ -798,13 +798,20 @@ function renderDashboard(panel){
     lookupInput.oninput = (e)=>{ dashLookupQuery = e.target.value; renderDashboard(panel);
       const el = document.getElementById('dashLookup'); el.focus(); el.setSelectionRange(dashLookupQuery.length, dashLookupQuery.length); };
   }
+  if(role==='comite'){
+    wireFicheMembre(panel, ()=>renderDashboard(panel));
+  }
 }
 
 function renderSelfLookup(){
   let resultHtml = '';
   if(dashLookupQuery.trim().length>1){
     const q = dashLookupQuery.trim().toLowerCase();
-    const matches = members.filter(m=>(m.prenom+' '+m.nom).toLowerCase().includes(q)).slice(0,5);
+    const qDigits = dashLookupQuery.replace(/[^\d]/g,'');
+    const matches = members.filter(m=>
+      (m.prenom+' '+m.nom).toLowerCase().includes(q) ||
+      (qDigits.length>=3 && (m.telephone||'').replace(/[^\d]/g,'').includes(qDigits))
+    ).slice(0,5);
     if(matches.length===0){
       resultHtml = `<div class="self-result">Aucun membre trouvé pour « ${dashLookupQuery} ».</div>`;
     }else{
@@ -816,7 +823,7 @@ function renderSelfLookup(){
         const busName = myBus ? (buses.find(b=>b.id===myBus.bus_id)||{}).nom : null;
         return `<div class="self-result">
           <div style="font-weight:700;font-size:14px;">${m.prenom} ${m.nom}</div>
-          <div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">${cat?cat.label:''}</div>
+          <div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">${cat?cat.label:''}${m.telephone?(' · '+m.telephone):''}</div>
           <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;">
             <span>Attendu : <b class="num">${fmt(m.montant_attendu)}</b></span>
             <span>Versé : <b class="num">${fmt(m.montant_verse)}</b></span>
@@ -824,16 +831,17 @@ function renderSelfLookup(){
             <span class="badge ${st}">${st==='paid'?'Payé':st==='partial'?'Partiel':'Non payé'}</span>
           </div>
           ${busName ? `<div style="margin-top:8px;font-size:12.5px;">Bus : <b>${busName}</b></div>` : ''}
+          ${role==='comite' ? `<div style="margin-top:10px;">${ficheMembreHtml(m)}</div>` : ''}
         </div>`;
       }).join('');
     }
   }
   return `
     <div class="self-lookup">
-      <h3>Rechercher mon statut</h3>
+      <h3>${role==='comite' ? 'Rechercher un membre (nom, prénom ou téléphone)' : 'Rechercher mon statut'}</h3>
       <div class="search-wrap">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="dashLookup" placeholder="Tapez votre nom..." value="${dashLookupQuery}"/>
+        <input type="text" id="dashLookup" placeholder="${role==='comite' ? 'Nom, prénom ou numéro...' : 'Tapez votre nom...'}" value="${dashLookupQuery}"/>
       </div>
       ${resultHtml}
     </div>
@@ -1138,39 +1146,55 @@ function renderCotSubpanel(){
         }
       };
     });
-    document.querySelectorAll('[data-fichetoggle]').forEach(btn=>{
-      btn.onclick = ()=>{
-        const id = parseInt(btn.dataset.fichetoggle);
-        memberFicheOpen[id] = !memberFicheOpen[id];
-        renderCotSubpanel();
-      };
-    });
-    document.querySelectorAll('[data-fichesave]').forEach(btn=>{
-      btn.onclick = async ()=>{
-        const id = parseInt(btn.dataset.fichesave);
-        const prenom = panel.querySelector(`.fiche-prenom[data-id="${id}"]`).value.trim();
-        const nom = panel.querySelector(`.fiche-nom[data-id="${id}"]`).value.trim();
-        const telephone = panel.querySelector(`.fiche-telephone[data-id="${id}"]`).value.trim();
-        const adresse = panel.querySelector(`.fiche-adresse[data-id="${id}"]`).value.trim();
-        const memo = panel.querySelector(`.fiche-memo[data-id="${id}"]`).value.trim();
-        if(!prenom){ showToast('Le prénom est obligatoire'); return; }
-        btn.disabled = true; btn.textContent = 'Enregistrement...';
-        const result = await saveCollectionSafely('members', (fresh)=>{
-          const x = fresh.find(mm=>mm.id===id);
-          if(x){ x.prenom=prenom; x.nom=nom; x.telephone=telephone; x.adresse=adresse; x.memo=memo; }
-          return fresh;
-        });
-        if(result.ok){
-          members = result.data;
-          memberFicheOpen[id] = false;
-          showToast('Fiche enregistrée');
-          renderCotSubpanel();
-        }else{
-          btn.disabled = false; btn.textContent = 'Enregistrer la fiche';
-        }
-      };
-    });
+    wireFicheMembre(panel, renderCotSubpanel);
   }
+}
+function ficheMembreHtml(m){
+  return `<button class="btn sm ghost" data-fichetoggle="${m.id}">${memberFicheOpen[m.id]?'Fermer la fiche':'📇 Fiche membre'}</button>
+    ${memberFicheOpen[m.id] ? `<div class="addform open" style="flex-basis:100%;flex-direction:column;align-items:stretch;margin-top:6px;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="text" class="fiche-prenom" data-id="${m.id}" placeholder="Prénom(s)" value="${m.prenom}" style="flex:1;min-width:120px;"/>
+        <input type="text" class="fiche-nom" data-id="${m.id}" placeholder="Nom" value="${m.nom||''}" style="flex:1;min-width:120px;"/>
+        <input type="tel" class="fiche-telephone" data-id="${m.id}" placeholder="Téléphone" value="${m.telephone||''}" style="flex:1;min-width:120px;"/>
+      </div>
+      <input type="text" class="fiche-adresse" data-id="${m.id}" placeholder="Adresse" value="${m.adresse||''}" style="margin-top:8px;"/>
+      <textarea class="fiche-memo" data-id="${m.id}" placeholder="Mémo (notes internes sur ce membre)" rows="2" style="margin-top:8px;padding:9px 12px;border-radius:9px;border:1px solid var(--line);font-family:inherit;font-size:13px;resize:vertical;">${m.memo||''}</textarea>
+      <div style="margin-top:8px;"><button class="btn primary sm" data-fichesave="${m.id}">Enregistrer la fiche</button></div>
+    </div>` : ''}`;
+}
+function wireFicheMembre(panel, rerender){
+  panel.querySelectorAll('[data-fichetoggle]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const id = parseInt(btn.dataset.fichetoggle);
+      memberFicheOpen[id] = !memberFicheOpen[id];
+      rerender();
+    };
+  });
+  panel.querySelectorAll('[data-fichesave]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const id = parseInt(btn.dataset.fichesave);
+      const prenom = panel.querySelector(`.fiche-prenom[data-id="${id}"]`).value.trim();
+      const nom = panel.querySelector(`.fiche-nom[data-id="${id}"]`).value.trim();
+      const telephone = panel.querySelector(`.fiche-telephone[data-id="${id}"]`).value.trim();
+      const adresse = panel.querySelector(`.fiche-adresse[data-id="${id}"]`).value.trim();
+      const memo = panel.querySelector(`.fiche-memo[data-id="${id}"]`).value.trim();
+      if(!prenom){ showToast('Le prénom est obligatoire'); return; }
+      btn.disabled = true; btn.textContent = 'Enregistrement...';
+      const result = await saveCollectionSafely('members', (fresh)=>{
+        const x = fresh.find(mm=>mm.id===id);
+        if(x){ x.prenom=prenom; x.nom=nom; x.telephone=telephone; x.adresse=adresse; x.memo=memo; }
+        return fresh;
+      });
+      if(result.ok){
+        members = result.data;
+        memberFicheOpen[id] = false;
+        showToast('Fiche enregistrée');
+        rerender();
+      }else{
+        btn.disabled = false; btn.textContent = 'Enregistrer la fiche';
+      }
+    };
+  });
 }
 function renderMemberRow(m, i, showCat){
   const st = statusOf(m);
@@ -1188,24 +1212,16 @@ function renderMemberRow(m, i, showCat){
     <div class="field f-reste"><div class="l">Reste</div><div class="v num">${fmt(reste)}</div></div>
     <span class="badge ${st}">${badgeLabel}</span>
     ${m.observation || m.bus || m.telephone || m.adresse || m.memo ? `<div class="obs">${[m.bus?('Bus: '+m.bus):null, m.telephone?('Tél: '+m.telephone):null, m.adresse?('Adr: '+m.adresse):null, m.memo?'📝 Mémo':null, m.observation].filter(Boolean).join(' · ')}</div>` : ''}
-    ${role==='comite' ? `<div class="cat-switch-row" style="grid-column:1/-1;display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap;">
+    ${role==='comite' ? `<div style="grid-column:1/-1;display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap;">
+      ${ficheMembreHtml(m)}
+    </div>
+    <div class="cat-switch-row" style="grid-column:1/-1;display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap;">
       <label style="font-size:11px;color:var(--ink-soft);">Catégorie :</label>
       <select class="cat-switch" data-id="${m.id}" style="font-size:11.5px;padding:3px 6px;border-radius:6px;border:1px solid var(--line);font-family:inherit;">
         ${CATEGORIES.map(c=>`<option value="${c.key}" ${c.key===m.categorie?'selected':''}>${c.label} (${fmt(c.base)})</option>`).join('')}
       </select>
-      <button class="btn sm ghost" data-fichetoggle="${m.id}">${memberFicheOpen[m.id]?'Fermer la fiche':'📇 Fiche membre'}</button>
       <button class="btn danger-ghost sm" data-delmember="${m.id}" style="margin-left:auto;">Supprimer ce membre</button>
-    </div>
-    ${memberFicheOpen[m.id] ? `<div class="addform open" style="grid-column:1/-1;flex-direction:column;align-items:stretch;margin-top:6px;">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <input type="text" class="fiche-prenom" data-id="${m.id}" placeholder="Prénom(s)" value="${m.prenom}" style="flex:1;min-width:120px;"/>
-        <input type="text" class="fiche-nom" data-id="${m.id}" placeholder="Nom" value="${m.nom||''}" style="flex:1;min-width:120px;"/>
-        <input type="tel" class="fiche-telephone" data-id="${m.id}" placeholder="Téléphone" value="${m.telephone||''}" style="flex:1;min-width:120px;"/>
-      </div>
-      <input type="text" class="fiche-adresse" data-id="${m.id}" placeholder="Adresse" value="${m.adresse||''}" style="margin-top:8px;"/>
-      <textarea class="fiche-memo" data-id="${m.id}" placeholder="Mémo (notes internes sur ce membre)" rows="2" style="margin-top:8px;padding:9px 12px;border-radius:9px;border:1px solid var(--line);font-family:inherit;font-size:13px;resize:vertical;">${m.memo||''}</textarea>
-      <div style="margin-top:8px;"><button class="btn primary sm" data-fichesave="${m.id}">Enregistrer la fiche</button></div>
-    </div>` : ''}` : ''}
+    </div>` : ''}
   </div>`;
 }
 
