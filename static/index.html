@@ -237,6 +237,7 @@ let role = 'membre';
 let mainTab = 'dashboard';
 let catTab = 'all';
 let searchQuery = '', statusFilter = 'all', sortByReste = false, addFormOpen = false;
+let memberFicheOpen = {}; // {memberId: true} — which member's detailed fiche panel is expanded
 let encQuery = '', encSelectedId = null;
 let encConfirmation = null; // {prenom, nom, telephone, montant, reste} shown right after a payment is saved
 let sessionLog = [];
@@ -298,9 +299,9 @@ function exportExcel(filename, sheetsDef){
 function exportCotisationsExcel(){
   const rows = members.map(m=>{
     const cat = CATEGORIES.find(c=>c.key===m.categorie);
-    return [cat?cat.label:m.categorie, m.prenom, m.nom||'', m.montant_attendu, m.montant_verse, Math.max(m.montant_attendu-m.montant_verse,0), statusOf(m)==='paid'?'Payé':statusOf(m)==='partial'?'Partiel':'Non payé', m.telephone||''];
+    return [cat?cat.label:m.categorie, m.prenom, m.nom||'', m.montant_attendu, m.montant_verse, Math.max(m.montant_attendu-m.montant_verse,0), statusOf(m)==='paid'?'Payé':statusOf(m)==='partial'?'Partiel':'Non payé', m.telephone||'', m.adresse||'', m.memo||''];
   });
-  exportExcel('maouloud2026-cotisations.xlsx', [{name:'Cotisations', headers:['Catégorie','Prénom','Nom','Attendu','Versé','Reste','Statut','Téléphone'], rows}]);
+  exportExcel('maouloud2026-cotisations.xlsx', [{name:'Cotisations', headers:['Catégorie','Prénom','Nom','Attendu','Versé','Reste','Statut','Téléphone','Adresse','Mémo'], rows}]);
 }
 function exportMobileMoneyExcel(){
   const rows = mobilemoney.map(x=>[x.nom, x.operateur, x.montant]);
@@ -783,9 +784,13 @@ function renderDashboard(panel){
   `;
   if(role==='comite'){
     const ri = document.getElementById('reportInput');
-    if(ri) ri.onchange = (e)=>{
+    if(ri) ri.onchange = async (e)=>{
       let v = parseInt(e.target.value); if(isNaN(v)) v=0;
-      synthese.report_caisse = v; saveKeyDebounced('synthese', synthese); renderDashboard(panel);
+      ri.disabled = true;
+      const fresh = (await loadFreshKey('synthese')) || synthese;
+      fresh.report_caisse = v;
+      const ok = await saveKey('synthese', fresh, false);
+      if(ok){ synthese = fresh; renderDashboard(panel); } else { ri.disabled = false; }
     };
   }
   const lookupInput = document.getElementById('dashLookup');
@@ -1133,6 +1138,38 @@ function renderCotSubpanel(){
         }
       };
     });
+    document.querySelectorAll('[data-fichetoggle]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const id = parseInt(btn.dataset.fichetoggle);
+        memberFicheOpen[id] = !memberFicheOpen[id];
+        renderCotSubpanel();
+      };
+    });
+    document.querySelectorAll('[data-fichesave]').forEach(btn=>{
+      btn.onclick = async ()=>{
+        const id = parseInt(btn.dataset.fichesave);
+        const prenom = panel.querySelector(`.fiche-prenom[data-id="${id}"]`).value.trim();
+        const nom = panel.querySelector(`.fiche-nom[data-id="${id}"]`).value.trim();
+        const telephone = panel.querySelector(`.fiche-telephone[data-id="${id}"]`).value.trim();
+        const adresse = panel.querySelector(`.fiche-adresse[data-id="${id}"]`).value.trim();
+        const memo = panel.querySelector(`.fiche-memo[data-id="${id}"]`).value.trim();
+        if(!prenom){ showToast('Le prénom est obligatoire'); return; }
+        btn.disabled = true; btn.textContent = 'Enregistrement...';
+        const result = await saveCollectionSafely('members', (fresh)=>{
+          const x = fresh.find(mm=>mm.id===id);
+          if(x){ x.prenom=prenom; x.nom=nom; x.telephone=telephone; x.adresse=adresse; x.memo=memo; }
+          return fresh;
+        });
+        if(result.ok){
+          members = result.data;
+          memberFicheOpen[id] = false;
+          showToast('Fiche enregistrée');
+          renderCotSubpanel();
+        }else{
+          btn.disabled = false; btn.textContent = 'Enregistrer la fiche';
+        }
+      };
+    });
   }
 }
 function renderMemberRow(m, i, showCat){
@@ -1150,14 +1187,25 @@ function renderMemberRow(m, i, showCat){
     <div class="field f-verse"><div class="l">Versé</div>${verseCell}</div>
     <div class="field f-reste"><div class="l">Reste</div><div class="v num">${fmt(reste)}</div></div>
     <span class="badge ${st}">${badgeLabel}</span>
-    ${m.observation || m.bus || m.telephone ? `<div class="obs">${[m.bus?('Bus: '+m.bus):null, m.telephone?('Tél: '+m.telephone):null, m.observation].filter(Boolean).join(' · ')}</div>` : ''}
+    ${m.observation || m.bus || m.telephone || m.adresse || m.memo ? `<div class="obs">${[m.bus?('Bus: '+m.bus):null, m.telephone?('Tél: '+m.telephone):null, m.adresse?('Adr: '+m.adresse):null, m.memo?'📝 Mémo':null, m.observation].filter(Boolean).join(' · ')}</div>` : ''}
     ${role==='comite' ? `<div class="cat-switch-row" style="grid-column:1/-1;display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap;">
       <label style="font-size:11px;color:var(--ink-soft);">Catégorie :</label>
       <select class="cat-switch" data-id="${m.id}" style="font-size:11.5px;padding:3px 6px;border-radius:6px;border:1px solid var(--line);font-family:inherit;">
         ${CATEGORIES.map(c=>`<option value="${c.key}" ${c.key===m.categorie?'selected':''}>${c.label} (${fmt(c.base)})</option>`).join('')}
       </select>
+      <button class="btn sm ghost" data-fichetoggle="${m.id}">${memberFicheOpen[m.id]?'Fermer la fiche':'📇 Fiche membre'}</button>
       <button class="btn danger-ghost sm" data-delmember="${m.id}" style="margin-left:auto;">Supprimer ce membre</button>
-    </div>` : ''}
+    </div>
+    ${memberFicheOpen[m.id] ? `<div class="addform open" style="grid-column:1/-1;flex-direction:column;align-items:stretch;margin-top:6px;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="text" class="fiche-prenom" data-id="${m.id}" placeholder="Prénom(s)" value="${m.prenom}" style="flex:1;min-width:120px;"/>
+        <input type="text" class="fiche-nom" data-id="${m.id}" placeholder="Nom" value="${m.nom||''}" style="flex:1;min-width:120px;"/>
+        <input type="tel" class="fiche-telephone" data-id="${m.id}" placeholder="Téléphone" value="${m.telephone||''}" style="flex:1;min-width:120px;"/>
+      </div>
+      <input type="text" class="fiche-adresse" data-id="${m.id}" placeholder="Adresse" value="${m.adresse||''}" style="margin-top:8px;"/>
+      <textarea class="fiche-memo" data-id="${m.id}" placeholder="Mémo (notes internes sur ce membre)" rows="2" style="margin-top:8px;padding:9px 12px;border-radius:9px;border:1px solid var(--line);font-family:inherit;font-size:13px;resize:vertical;">${m.memo||''}</textarea>
+      <div style="margin-top:8px;"><button class="btn primary sm" data-fichesave="${m.id}">Enregistrer la fiche</button></div>
+    </div>` : ''}` : ''}
   </div>`;
 }
 
@@ -1184,9 +1232,9 @@ function renderMobileMoney(panel){
         ${mobilemoney.length===0 ? `<div class="empty">Aucun versement enregistré.</div>` : mobilemoney.map((x,i)=>`
         <div class="mrow" style="grid-template-columns:28px 1.6fr 1fr 1fr ${role==='comite'?'60px':''};">
           <div class="idx num">${i+1}</div>
-          <div class="name">${x.nom}</div>
-          <div class="field"><div class="l">Opérateur</div><div class="v">${x.operateur}</div></div>
-          <div class="field"><div class="l">Montant</div><div class="v num">${fmt(x.montant)}</div></div>
+          ${role==='comite' ? `<input type="text" class="mm-nom-edit" data-id="${x.id}" value="${x.nom}"/>` : `<div class="name">${x.nom}</div>`}
+          <div class="field"><div class="l">Opérateur</div>${role==='comite' ? `<select class="mm-op-edit" data-id="${x.id}"><option value="WAVE" ${x.operateur==='WAVE'?'selected':''}>Wave</option><option value="Orange Money" ${x.operateur==='Orange Money'?'selected':''}>Orange Money</option></select>` : `<div class="v">${x.operateur}</div>`}</div>
+          <div class="field"><div class="l">Montant</div>${role==='comite' ? `<input type="number" class="mm-montant-edit" data-id="${x.id}" value="${x.montant}" min="0"/>` : `<div class="v num">${fmt(x.montant)}</div>`}</div>
           ${role==='comite' ? `<button class="btn danger-ghost" data-del="${x.id}">Suppr.</button>` : ''}
         </div>`).join('')}
       </div>
@@ -1199,17 +1247,45 @@ function renderMobileMoney(panel){
     const cancelBtn = document.getElementById('mmCancelBtn');
     if(cancelBtn) cancelBtn.onclick = ()=>{ mmAddOpen=false; renderMobileMoney(panel); };
     const saveBtn = document.getElementById('mmSaveBtn');
-    if(saveBtn) saveBtn.onclick = ()=>{
+    if(saveBtn) saveBtn.onclick = async ()=>{
       const nom = document.getElementById('mm-nom').value.trim();
       const op = document.getElementById('mm-op').value;
       const montant = parseInt(document.getElementById('mm-montant').value) || 0;
       if(!nom || montant<=0){ showToast('Nom et montant requis'); return; }
-      const maxId = mobilemoney.reduce((a,x)=>Math.max(a,x.id),0);
-      mobilemoney.push({id:maxId+1, nom, operateur:op, montant});
-      mmAddOpen=false; saveKey('mobilemoney', mobilemoney, true); renderMobileMoney(panel);
+      saveBtn.disabled = true; saveBtn.textContent = 'Enregistrement...';
+      const result = await saveCollectionSafely('mobilemoney', (fresh)=>{
+        const maxId = fresh.reduce((a,x)=>Math.max(a,x.id),0);
+        fresh.push({id:maxId+1, nom, operateur:op, montant});
+        return fresh;
+      });
+      if(result.ok){ mobilemoney = result.data; mmAddOpen=false; renderMobileMoney(panel); showToast('Versement ajouté'); }
+      else{ saveBtn.disabled = false; saveBtn.textContent = 'Enregistrer'; }
     };
+    const editField = (selector, applyFn)=>{
+      panel.querySelectorAll(selector).forEach(inp=>{
+        inp.onchange = async (e)=>{
+          const id = parseInt(e.target.dataset.id);
+          e.target.disabled = true;
+          const result = await saveCollectionSafely('mobilemoney', (fresh)=>{
+            const x = fresh.find(m=>m.id===id); if(x) applyFn(x, e.target.value);
+            return fresh;
+          });
+          if(result.ok){ mobilemoney = result.data; renderMobileMoney(panel); }
+          else{ e.target.disabled = false; }
+        };
+      });
+    };
+    editField('.mm-nom-edit', (x,v)=>{ x.nom = v.trim(); });
+    editField('.mm-op-edit', (x,v)=>{ x.operateur = v; });
+    editField('.mm-montant-edit', (x,v)=>{ let n=parseInt(v); x.montant = (isNaN(n)||n<0) ? 0 : n; });
     panel.querySelectorAll('[data-del]').forEach(b=>{
-      b.onclick = ()=>{ mobilemoney = mobilemoney.filter(x=>x.id!==parseInt(b.dataset.del)); saveKey('mobilemoney', mobilemoney, true); renderMobileMoney(panel); };
+      b.onclick = async ()=>{
+        const id = parseInt(b.dataset.del);
+        b.disabled = true;
+        const result = await saveCollectionSafely('mobilemoney', (fresh)=> fresh.filter(x=>x.id!==id));
+        if(result.ok){ mobilemoney = result.data; renderMobileMoney(panel); showToast('Versement supprimé'); }
+        else{ b.disabled = false; }
+      };
     });
   }
 }
@@ -1236,10 +1312,10 @@ function renderBonnesVolontes(panel){
       </div>` : ''}
       <div class="mlist" style="margin-top:14px;">
         ${bonnesvolontes.length===0 ? `<div class="empty">Aucun contributeur enregistré.</div>` : bonnesvolontes.map((x,i)=>`
-        <div class="mrow" style="grid-template-columns:28px 1.6fr 1fr ${role==='comite'?'60px':''};">
+        <div class="mrow" style="grid-template-columns:28px 1.6fr 1fr ${role==='comite'?'110px':''};">
           <div class="idx num">${i+1}</div>
           <div class="name">${x.nom}${x.observation?`<div class="cat-badge">${x.observation}</div>`:''}</div>
-          <div class="field"><div class="l">Montant</div><div class="v num">${fmt(x.montant)}</div></div>
+          <div class="field"><div class="l">Montant</div>${role==='comite' ? `<input type="number" class="bv-montant-edit" data-id="${x.id}" value="${x.montant}" min="0"/>` : `<div class="v num">${fmt(x.montant)}</div>`}</div>
           ${role==='comite' ? `<button class="btn danger-ghost" data-del="${x.id}">Suppr.</button>` : ''}
         </div>`).join('')}
       </div>
@@ -1272,30 +1348,71 @@ function renderBonnesVolontes(panel){
     document.getElementById('bvAddBtn').onclick = ()=>{ bvAddOpen=!bvAddOpen; renderBonnesVolontes(panel); };
     const bvCancel = document.getElementById('bvCancelBtn'); if(bvCancel) bvCancel.onclick=()=>{ bvAddOpen=false; renderBonnesVolontes(panel); };
     const bvSave = document.getElementById('bvSaveBtn');
-    if(bvSave) bvSave.onclick = ()=>{
+    if(bvSave) bvSave.onclick = async ()=>{
       const nom = document.getElementById('bv-nom').value.trim();
       const montant = parseInt(document.getElementById('bv-montant').value)||0;
       const obs = document.getElementById('bv-obs').value.trim();
       if(!nom){ showToast('Le nom est obligatoire'); return; }
-      const maxId = bonnesvolontes.reduce((a,x)=>Math.max(a,x.id),0);
-      bonnesvolontes.push({id:maxId+1, nom, montant, observation:obs});
-      bvAddOpen=false; saveKey('bonnesvolontes', bonnesvolontes, true); renderBonnesVolontes(panel);
+      bvSave.disabled = true; bvSave.textContent = 'Enregistrement...';
+      const result = await saveCollectionSafely('bonnesvolontes', (fresh)=>{
+        const maxId = fresh.reduce((a,x)=>Math.max(a,x.id),0);
+        fresh.push({id:maxId+1, nom, montant, observation:obs});
+        return fresh;
+      });
+      if(result.ok){ bonnesvolontes = result.data; bvAddOpen=false; renderBonnesVolontes(panel); showToast('Contributeur ajouté'); }
+      else{ bvSave.disabled = false; bvSave.textContent = 'Enregistrer'; }
     };
-    panel.querySelectorAll('[data-del]').forEach(b=>{ b.onclick=()=>{ bonnesvolontes=bonnesvolontes.filter(x=>x.id!==parseInt(b.dataset.del)); saveKey('bonnesvolontes', bonnesvolontes, true); renderBonnesVolontes(panel); }; });
+    panel.querySelectorAll('.bv-montant-edit').forEach(inp=>{
+      inp.onchange = async (e)=>{
+        const id = parseInt(e.target.dataset.id);
+        let v = parseInt(e.target.value); if(isNaN(v)||v<0) v=0;
+        e.target.disabled = true;
+        const result = await saveCollectionSafely('bonnesvolontes', (fresh)=>{
+          const x = fresh.find(b=>b.id===id); if(x) x.montant = v;
+          return fresh;
+        });
+        if(result.ok){ bonnesvolontes = result.data; renderBonnesVolontes(panel); }
+        else{ e.target.disabled = false; }
+      };
+    });
+    panel.querySelectorAll('[data-del]').forEach(b=>{
+      b.onclick = async ()=>{
+        const id = parseInt(b.dataset.del);
+        const x = bonnesvolontes.find(c=>c.id===id);
+        if(x && !confirm(`Supprimer ${x.nom} des bonnes volontés ?`)) return;
+        b.disabled = true;
+        const result = await saveCollectionSafely('bonnesvolontes', (fresh)=> fresh.filter(c=>c.id!==id));
+        if(result.ok){ bonnesvolontes = result.data; renderBonnesVolontes(panel); showToast('Contributeur supprimé'); }
+        else{ b.disabled = false; }
+      };
+    });
 
     const dnBtn = document.getElementById('dnAddBtn');
     if(dnBtn) dnBtn.onclick = ()=>{ dnAddOpen=!dnAddOpen; renderBonnesVolontes(panel); };
     const dnCancel = document.getElementById('dnCancelBtn'); if(dnCancel) dnCancel.onclick=()=>{ dnAddOpen=false; renderBonnesVolontes(panel); };
     const dnSave = document.getElementById('dnSaveBtn');
-    if(dnSave) dnSave.onclick = ()=>{
+    if(dnSave) dnSave.onclick = async ()=>{
       const donateur = document.getElementById('dn-donateur').value.trim();
       const article = document.getElementById('dn-article').value.trim();
       if(!donateur || !article){ showToast('Donateur et article requis'); return; }
-      const maxId = donsnature.reduce((a,x)=>Math.max(a,x.id),0);
-      donsnature.push({id:maxId+1, donateur, article});
-      dnAddOpen=false; saveKey('donsnature', donsnature, true); renderBonnesVolontes(panel);
+      dnSave.disabled = true; dnSave.textContent = 'Enregistrement...';
+      const result = await saveCollectionSafely('donsnature', (fresh)=>{
+        const maxId = fresh.reduce((a,x)=>Math.max(a,x.id),0);
+        fresh.push({id:maxId+1, donateur, article});
+        return fresh;
+      });
+      if(result.ok){ donsnature = result.data; dnAddOpen=false; renderBonnesVolontes(panel); showToast('Don en nature ajouté'); }
+      else{ dnSave.disabled = false; dnSave.textContent = 'Enregistrer'; }
     };
-    panel.querySelectorAll('[data-deldn]').forEach(b=>{ b.onclick=()=>{ donsnature=donsnature.filter(x=>x.id!==parseInt(b.dataset.deldn)); saveKey('donsnature', donsnature, true); renderBonnesVolontes(panel); }; });
+    panel.querySelectorAll('[data-deldn]').forEach(b=>{
+      b.onclick = async ()=>{
+        const id = parseInt(b.dataset.deldn);
+        b.disabled = true;
+        const result = await saveCollectionSafely('donsnature', (fresh)=> fresh.filter(x=>x.id!==id));
+        if(result.ok){ donsnature = result.data; renderBonnesVolontes(panel); showToast('Don en nature supprimé'); }
+        else{ b.disabled = false; }
+      };
+    });
   }
 }
 
@@ -1320,10 +1437,10 @@ function renderZiar(panel){
       </div>` : ''}
       <div class="mlist" style="margin-top:14px;">
         ${ziar.length===0 ? `<div class="empty">Aucune contribution Ziar enregistrée.</div>` : ziar.map((x,i)=>`
-        <div class="mrow" style="grid-template-columns:28px 1.6fr 1fr ${role==='comite'?'60px':''};">
+        <div class="mrow" style="grid-template-columns:28px 1.6fr 1fr ${role==='comite'?'110px':''};">
           <div class="idx num">${i+1}</div>
           <div class="name">${x.nom}${x.observation?`<div class="cat-badge">${x.observation}</div>`:''}</div>
-          <div class="field"><div class="l">Montant</div><div class="v num">${fmt(x.montant)}</div></div>
+          <div class="field"><div class="l">Montant</div>${role==='comite' ? `<input type="number" class="ziar-montant-edit" data-id="${x.id}" value="${x.montant}" min="0"/>` : `<div class="v num">${fmt(x.montant)}</div>`}</div>
           ${role==='comite' ? `<button class="btn danger-ghost" data-del="${x.id}">Suppr.</button>` : ''}
         </div>`).join('')}
       </div>
@@ -1335,17 +1452,41 @@ function renderZiar(panel){
     document.getElementById('ziarAddBtn').onclick = ()=>{ ziarAddOpen=!ziarAddOpen; renderZiar(panel); };
     const cancelBtn = document.getElementById('ziarCancelBtn'); if(cancelBtn) cancelBtn.onclick = ()=>{ ziarAddOpen=false; renderZiar(panel); };
     const saveBtn = document.getElementById('ziarSaveBtn');
-    if(saveBtn) saveBtn.onclick = ()=>{
+    if(saveBtn) saveBtn.onclick = async ()=>{
       const nom = document.getElementById('ziar-nom').value.trim();
       const montant = parseInt(document.getElementById('ziar-montant').value)||0;
       const obs = document.getElementById('ziar-obs').value.trim();
       if(!nom){ showToast('Le nom est obligatoire'); return; }
-      const maxId = ziar.reduce((a,x)=>Math.max(a,x.id),0);
-      ziar.push({id:maxId+1, nom, montant, observation:obs});
-      ziarAddOpen=false; saveKey('ziar', ziar, true); renderZiar(panel);
+      saveBtn.disabled = true; saveBtn.textContent = 'Enregistrement...';
+      const result = await saveCollectionSafely('ziar', (fresh)=>{
+        const maxId = fresh.reduce((a,x)=>Math.max(a,x.id),0);
+        fresh.push({id:maxId+1, nom, montant, observation:obs});
+        return fresh;
+      });
+      if(result.ok){ ziar = result.data; ziarAddOpen=false; renderZiar(panel); showToast('Contribution ajoutée'); }
+      else{ saveBtn.disabled = false; saveBtn.textContent = 'Enregistrer'; }
     };
+    panel.querySelectorAll('.ziar-montant-edit').forEach(inp=>{
+      inp.onchange = async (e)=>{
+        const id = parseInt(e.target.dataset.id);
+        let v = parseInt(e.target.value); if(isNaN(v)||v<0) v=0;
+        e.target.disabled = true;
+        const result = await saveCollectionSafely('ziar', (fresh)=>{
+          const x = fresh.find(z=>z.id===id); if(x) x.montant = v;
+          return fresh;
+        });
+        if(result.ok){ ziar = result.data; renderZiar(panel); }
+        else{ e.target.disabled = false; }
+      };
+    });
     panel.querySelectorAll('[data-del]').forEach(b=>{
-      b.onclick = ()=>{ ziar = ziar.filter(x=>x.id!==parseInt(b.dataset.del)); saveKey('ziar', ziar, true); renderZiar(panel); };
+      b.onclick = async ()=>{
+        const id = parseInt(b.dataset.del);
+        b.disabled = true;
+        const result = await saveCollectionSafely('ziar', (fresh)=> fresh.filter(x=>x.id!==id));
+        if(result.ok){ ziar = result.data; renderZiar(panel); showToast('Contribution supprimée'); }
+        else{ b.disabled = false; }
+      };
     });
   }
 }
@@ -1378,14 +1519,17 @@ function renderDepenses(panel){
       <div class="mlist" style="margin-top:14px;">
         ${depenses.length===0 ? `<div class="empty">Aucune dépense enregistrée.</div>` : depenses.map((x,i)=>{
           const histo = Object.keys(x.historique||{}).sort().map(y=>`${y}: ${fmt(x.historique[y])}`).join(' · ');
+          const libelleCell = role==='comite' ? `<input type="text" class="dep-libelle" data-id="${x.id}" value="${x.libelle}"/>` : `<div class="name">${x.libelle}</div>`;
+          const respCell = role==='comite' ? `<input type="text" class="dep-resp" data-id="${x.id}" value="${x.responsable||''}" placeholder="Responsable"/>` : `<div class="cat-badge">${x.responsable?('Resp. '+x.responsable):'Sans responsable désigné'}</div>`;
           const avCell = role==='comite' ? `<input type="number" class="dep-av" data-id="${x.id}" value="${x.avance}" min="0"/>` : `<div class="v num">${fmt(x.avance)}</div>`;
           const juCell = role==='comite' ? `<input type="number" class="dep-ju" data-id="${x.id}" value="${x.justifie}" min="0"/>` : `<div class="v num">${fmt(x.justifie)}</div>`;
           return `<div class="mrow" style="grid-template-columns:28px 1.4fr 1fr 1fr 110px;">
             <div class="idx num">${i+1}</div>
-            <div><div class="name">${x.libelle}</div><div class="cat-badge">${x.responsable?('Resp. '+x.responsable):'Sans responsable désigné'}</div></div>
+            <div>${libelleCell}${respCell}</div>
             <div class="field"><div class="l">Avancé 2026</div>${avCell}</div>
             <div class="field"><div class="l">Justifié</div>${juCell}</div>
             ${reliquatBadge(x.avance, x.justifie)}
+            ${role==='comite' ? `<button class="btn danger-ghost" data-deldep="${x.id}" style="grid-column:1/-1;justify-self:start;">Supprimer cette dépense</button>` : ''}
             ${histo ? `<div class="obs">Historique : ${histo}</div>` : ''}
           </div>`;
         }).join('')}
@@ -1398,16 +1542,50 @@ function renderDepenses(panel){
     document.getElementById('depAddBtn').onclick = ()=>{ depAddOpen=!depAddOpen; renderDepenses(panel); };
     const cancel = document.getElementById('depCancelBtn'); if(cancel) cancel.onclick=()=>{ depAddOpen=false; renderDepenses(panel); };
     const save = document.getElementById('depSaveBtn');
-    if(save) save.onclick = ()=>{
+    if(save) save.onclick = async ()=>{
       const libelle = document.getElementById('dep-libelle').value.trim();
       const resp = document.getElementById('dep-resp').value.trim();
       if(!libelle){ showToast('Le libellé est obligatoire'); return; }
-      const maxId = depenses.reduce((a,x)=>Math.max(a,x.id),0);
-      depenses.push({id:maxId+1, libelle, avance:0, justifie:0, responsable:resp, historique:{}});
-      depAddOpen=false; saveKey('depenses', depenses, true); renderDepenses(panel);
+      save.disabled = true; save.textContent = 'Enregistrement...';
+      const result = await saveCollectionSafely('depenses', (fresh)=>{
+        const maxId = fresh.reduce((a,x)=>Math.max(a,x.id),0);
+        fresh.push({id:maxId+1, libelle, avance:0, justifie:0, responsable:resp, historique:{}});
+        return fresh;
+      });
+      if(result.ok){ depenses = result.data; depAddOpen=false; renderDepenses(panel); showToast('Dépense ajoutée'); }
+      else{ save.disabled = false; save.textContent = 'Enregistrer'; }
     };
-    panel.querySelectorAll('.dep-av').forEach(inp=>{ inp.onchange=(e)=>{ const x=depenses.find(d=>d.id===parseInt(e.target.dataset.id)); let v=parseInt(e.target.value); if(isNaN(v)||v<0)v=0; x.avance=v; saveKeyDebounced('depenses', depenses); renderDepenses(panel); }; });
-    panel.querySelectorAll('.dep-ju').forEach(inp=>{ inp.onchange=(e)=>{ const x=depenses.find(d=>d.id===parseInt(e.target.dataset.id)); let v=parseInt(e.target.value); if(isNaN(v)||v<0)v=0; x.justifie=v; saveKeyDebounced('depenses', depenses); renderDepenses(panel); }; });
+    const editField = (selector, applyFn)=>{
+      panel.querySelectorAll(selector).forEach(inp=>{
+        inp.onchange = async (e)=>{
+          const id = parseInt(e.target.dataset.id);
+          e.target.disabled = true;
+          const result = await saveCollectionSafely('depenses', (fresh)=>{
+            const x = fresh.find(d=>d.id===id);
+            if(x) applyFn(x, e.target.value);
+            return fresh;
+          });
+          if(result.ok){ depenses = result.data; renderDepenses(panel); }
+          else{ e.target.disabled = false; }
+        };
+      });
+    };
+    editField('.dep-libelle', (x,v)=>{ x.libelle = v.trim(); });
+    editField('.dep-resp', (x,v)=>{ x.responsable = v.trim(); });
+    editField('.dep-av', (x,v)=>{ let n=parseInt(v); x.avance = (isNaN(n)||n<0) ? 0 : n; });
+    editField('.dep-ju', (x,v)=>{ let n=parseInt(v); x.justifie = (isNaN(n)||n<0) ? 0 : n; });
+    panel.querySelectorAll('[data-deldep]').forEach(btn=>{
+      btn.onclick = async ()=>{
+        const id = parseInt(btn.dataset.deldep);
+        const x = depenses.find(d=>d.id===id);
+        if(!x) return;
+        if(!confirm(`Supprimer définitivement la dépense "${x.libelle}" ?`)) return;
+        btn.disabled = true; btn.textContent = 'Suppression...';
+        const result = await saveCollectionSafely('depenses', (fresh)=> fresh.filter(d=>d.id!==id));
+        if(result.ok){ depenses = result.data; renderDepenses(panel); showToast('Dépense supprimée'); }
+        else{ btn.disabled = false; btn.textContent = 'Supprimer cette dépense'; }
+      };
+    });
   }
 }
 
@@ -1500,34 +1678,96 @@ function renderBus(panel){
   panel.querySelectorAll('.bus-print-one').forEach(btn=>{ btn.onclick = ()=>printBusManifest(parseInt(btn.dataset.busprint)); });
   if(role==='comite'){
     const btDepart = document.getElementById('bt-depart');
-    if(btDepart) btDepart.onchange = (e)=>{ busTransport.depart = e.target.value.trim() || 'SEFA Pikine'; saveKeyDebounced('bustransport', busTransport); renderBus(panel); };
+    if(btDepart) btDepart.onchange = async (e)=>{
+      const v = e.target.value.trim() || 'SEFA Pikine';
+      e.target.disabled = true;
+      const fresh = (await loadFreshKey('bustransport')) || busTransport;
+      fresh.depart = v;
+      const ok = await saveKey('bustransport', fresh, false);
+      if(ok){ busTransport = fresh; renderBus(panel); } else { e.target.disabled = false; }
+    };
     const btDest = document.getElementById('bt-destination');
-    if(btDest) btDest.onchange = (e)=>{ busTransport.destination = e.target.value.trim() || 'Barobé Diackel'; saveKeyDebounced('bustransport', busTransport); renderBus(panel); };
+    if(btDest) btDest.onchange = async (e)=>{
+      const v = e.target.value.trim() || 'Barobé Diackel';
+      e.target.disabled = true;
+      const fresh = (await loadFreshKey('bustransport')) || busTransport;
+      fresh.destination = v;
+      const ok = await saveKey('bustransport', fresh, false);
+      if(ok){ busTransport = fresh; renderBus(panel); } else { e.target.disabled = false; }
+    };
     const btDate = document.getElementById('bt-date');
-    if(btDate) btDate.onchange = (e)=>{ busTransport.date_depart = e.target.value; saveKeyDebounced('bustransport', busTransport); renderBus(panel); };
+    if(btDate) btDate.onchange = async (e)=>{
+      const v = e.target.value;
+      e.target.disabled = true;
+      const fresh = (await loadFreshKey('bustransport')) || busTransport;
+      fresh.date_depart = v;
+      const ok = await saveKey('bustransport', fresh, false);
+      if(ok){ busTransport = fresh; renderBus(panel); } else { e.target.disabled = false; }
+    };
     const addBtn = document.getElementById('busAddBtn');
     if(addBtn) addBtn.onclick = ()=>{ busAddOpen=!busAddOpen; renderBus(panel); };
     const cancel = document.getElementById('busCancelBtn'); if(cancel) cancel.onclick=()=>{ busAddOpen=false; renderBus(panel); };
     const save = document.getElementById('busSaveBtn');
-    if(save) save.onclick = ()=>{
+    if(save) save.onclick = async ()=>{
       if(buses.length >= MAX_BUSES){ showToast(`Maximum ${MAX_BUSES} bus`); return; }
       const nom = document.getElementById('bus-nom').value.trim();
       let cap = parseInt(document.getElementById('bus-cap').value)||MAX_CAPACITE;
       if(cap > MAX_CAPACITE){ cap = MAX_CAPACITE; showToast(`Capacité limitée à ${MAX_CAPACITE} places`); }
       if(!nom){ showToast('Le nom du bus est obligatoire'); return; }
-      const maxId = buses.reduce((a,x)=>Math.max(a,x.id),0);
-      buses.push({id:maxId+1, nom, capacite:cap});
-      busAddOpen=false; saveKey('buses', buses, true); renderBus(panel);
+      save.disabled = true; save.textContent = 'Création...';
+      const result = await saveCollectionSafely('buses', (fresh)=>{
+        if(fresh.length >= MAX_BUSES) return fresh;
+        const maxId = fresh.reduce((a,x)=>Math.max(a,x.id),0);
+        fresh.push({id:maxId+1, nom, capacite:cap});
+        return fresh;
+      });
+      if(result.ok){ buses = result.data; busAddOpen=false; renderBus(panel); showToast('Bus créé'); }
+      else{ save.disabled = false; save.textContent = 'Créer'; }
     };
     panel.querySelectorAll('.bus-cap-input').forEach(inp=>{
-      inp.onchange = (e)=>{
-        const b = buses.find(x=>x.id===parseInt(e.target.dataset.id));
+      inp.onchange = async (e)=>{
+        const id = parseInt(e.target.dataset.id);
         let v = parseInt(e.target.value);
         if(isNaN(v) || v<0) v = 0;
         if(v > MAX_CAPACITE){ v = MAX_CAPACITE; showToast(`Capacité limitée à ${MAX_CAPACITE} places`); }
-        b.capacite = v;
-        saveKeyDebounced('buses', buses);
-        renderBus(panel);
+        e.target.disabled = true;
+        const result = await saveCollectionSafely('buses', (fresh)=>{
+          const x = fresh.find(bb=>bb.id===id); if(x) x.capacite = v;
+          return fresh;
+        });
+        if(result.ok){ buses = result.data; renderBus(panel); }
+        else{ e.target.disabled = false; }
+      };
+    });
+    panel.querySelectorAll('.bus-nom-edit').forEach(inp=>{
+      inp.onchange = async (e)=>{
+        const id = parseInt(e.target.dataset.id);
+        const v = e.target.value.trim();
+        if(!v){ showToast('Le nom du bus est obligatoire'); e.target.value = (buses.find(x=>x.id===id)||{}).nom||''; return; }
+        e.target.disabled = true;
+        const result = await saveCollectionSafely('buses', (fresh)=>{
+          const x = fresh.find(bb=>bb.id===id); if(x) x.nom = v;
+          return fresh;
+        });
+        if(result.ok){ buses = result.data; renderBus(panel); }
+        else{ e.target.disabled = false; }
+      };
+    });
+    panel.querySelectorAll('[data-delbus]').forEach(btn=>{
+      btn.onclick = async ()=>{
+        const id = parseInt(btn.dataset.delbus);
+        const b = buses.find(x=>x.id===id);
+        if(!b) return;
+        const occCount = busOccupants(id).length;
+        const warn = occCount>0 ? `\n⚠️ ${occCount} voyageur(s) inscrit(s) seront également retirés.` : '';
+        if(!confirm(`Supprimer définitivement "${b.nom}" ?${warn}`)) return;
+        btn.disabled = true; btn.textContent = 'Suppression...';
+        const voyResult = await saveCollectionSafely('voyageurs', (fresh)=> fresh.filter(v=>v.bus_id!==id));
+        if(!voyResult.ok){ btn.disabled=false; btn.textContent='Supprimer'; return; }
+        voyageurs = voyResult.data;
+        const busResult = await saveCollectionSafely('buses', (fresh)=> fresh.filter(x=>x.id!==id));
+        if(busResult.ok){ buses = busResult.data; showToast('Bus supprimé'); renderBus(panel); }
+        else{ btn.disabled=false; btn.textContent='Supprimer'; }
       };
     });
   }
@@ -1541,13 +1781,19 @@ function renderBusCard(b){
   const capCell = role==='comite'
     ? `<input type="number" class="bus-cap-input" data-id="${b.id}" value="${b.capacite}" min="0" max="${MAX_CAPACITE}" style="width:64px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:center;"/>`
     : `${b.capacite}`;
+  const nomCell = role==='comite'
+    ? `<input type="text" class="bus-nom-edit" data-id="${b.id}" value="${b.nom}" style="font-family:'Fraunces',serif;font-weight:600;font-size:15px;color:var(--primary-dark);border:1px solid var(--line);border-radius:6px;padding:3px 7px;width:130px;"/>`
+    : `<div class="n">${b.nom}</div>`;
   return `
     <div class="bus-card">
       <div class="bus-card-head">
-        <div><div class="n">${b.nom}</div><div class="cat-badge">${busTransport.depart} → ${busTransport.destination}</div></div>
+        <div>${nomCell}<div class="cat-badge">${busTransport.depart} → ${busTransport.destination}</div></div>
         <div style="text-align:right;">
           <div class="cap">${occ.length} / ${capCell} places</div>
-          <button class="btn sm ghost bus-print-one" data-busprint="${b.id}" style="margin-top:4px;padding:3px 8px;font-size:11px;">🖨 Imprimer</button>
+          <div style="display:flex;gap:4px;justify-content:flex-end;margin-top:4px;">
+            <button class="btn sm ghost bus-print-one" data-busprint="${b.id}" style="padding:3px 8px;font-size:11px;">🖨 Imprimer</button>
+            ${role==='comite' ? `<button class="btn sm danger-ghost" data-delbus="${b.id}" style="padding:3px 8px;font-size:11px;">Supprimer</button>` : ''}
+          </div>
         </div>
       </div>
       <div class="occ-bar"><div class="occ-fill ${over?'over':''}" style="width:${pct}%"></div></div>
@@ -1636,39 +1882,63 @@ function wireBusCards(panel){
     };
   });
   panel.querySelectorAll('[data-voysave]').forEach(btn=>{
-    btn.onclick = ()=>{
+    btn.onclick = async ()=>{
       const busId = parseInt(btn.dataset.voysave);
       const vf = voyForm[busId];
       const phone = (vf.telephone||'').trim();
-      const maxId = voyageurs.reduce((a,x)=>Math.max(a,x.id),0);
+      let newNom, estMembre, membreId;
       if(vf.isMember){
         if(!vf.memberId){ showToast('Sélectionnez un membre dans la liste'); return; }
         const m = members.find(x=>x.id===vf.memberId);
-        voyageurs.push({id:maxId+1, bus_id:busId, nom:`${m.prenom} ${m.nom}`, est_membre:true, membre_id:m.id, telephone:phone});
+        newNom = `${m.prenom} ${m.nom}`; estMembre = true; membreId = m.id;
       }else{
         const nameInput = panel.querySelector(`[data-voyname="${busId}"]`);
-        const nom = nameInput.value.trim();
-        if(!nom){ showToast('Le nom du voyageur est obligatoire'); return; }
-        voyageurs.push({id:maxId+1, bus_id:busId, nom, est_membre:false, membre_id:null, telephone:phone});
+        newNom = nameInput.value.trim();
+        if(!newNom){ showToast('Le nom du voyageur est obligatoire'); return; }
+        estMembre = false; membreId = null;
       }
-      voyForm[busId] = {open:false, isMember:true, memberQuery:'', memberId:null, telephone:''};
-      saveKey('voyageurs', voyageurs, true);
-      renderBus(panel);
+      btn.disabled = true; btn.textContent = 'Ajout...';
+      const result = await saveCollectionSafely('voyageurs', (fresh)=>{
+        const maxId = fresh.reduce((a,x)=>Math.max(a,x.id),0);
+        fresh.push({id:maxId+1, bus_id:busId, nom:newNom, est_membre:estMembre, membre_id:membreId, telephone:phone});
+        return fresh;
+      });
+      if(result.ok){
+        voyageurs = result.data;
+        voyForm[busId] = {open:false, isMember:true, memberQuery:'', memberId:null, telephone:''};
+        renderBus(panel);
+      }else{
+        btn.disabled = false; btn.textContent = 'Ajouter';
+      }
     };
   });
   panel.querySelectorAll('[data-voyphone]').forEach(inp=>{
     inp.oninput = (e)=>{
       const id = parseInt(inp.dataset.voyphone);
       const v = voyageurs.find(x=>x.id===id);
-      v.telephone = e.target.value;
-      saveKeyDebounced('voyageurs', voyageurs);
+      if(v) v.telephone = e.target.value; // local-only live update, for instant WhatsApp button feedback
       renderBus(panel);
       const el = panel.querySelector(`[data-voyphone="${id}"]`);
       if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
     };
+    inp.onblur = async (e)=>{
+      const id = parseInt(inp.dataset.voyphone);
+      const finalValue = e.target.value.trim();
+      const result = await saveCollectionSafely('voyageurs', (fresh)=>{
+        const v = fresh.find(x=>x.id===id); if(v) v.telephone = finalValue;
+        return fresh;
+      });
+      if(result.ok) voyageurs = result.data;
+    };
   });
   panel.querySelectorAll('[data-delvoy]').forEach(btn=>{
-    btn.onclick = ()=>{ voyageurs = voyageurs.filter(v=>v.id!==parseInt(btn.dataset.delvoy)); saveKey('voyageurs', voyageurs, true); renderBus(panel); };
+    btn.onclick = async ()=>{
+      const id = parseInt(btn.dataset.delvoy);
+      btn.disabled = true;
+      const result = await saveCollectionSafely('voyageurs', (fresh)=> fresh.filter(v=>v.id!==id));
+      if(result.ok){ voyageurs = result.data; renderBus(panel); }
+      else{ btn.disabled = false; }
+    };
   });
 }
 
@@ -1718,12 +1988,12 @@ function exportFullBackupJSON(){
 function exportFullBackupExcel(){
   const cotisRows = members.map(m=>{
     const cat = CATEGORIES.find(c=>c.key===m.categorie);
-    return [cat?cat.label:m.categorie, m.prenom, m.nom||'', m.montant_attendu, m.montant_verse, Math.max(m.montant_attendu-m.montant_verse,0), statusOf(m)==='paid'?'Payé':statusOf(m)==='partial'?'Partiel':'Non payé', m.telephone||''];
+    return [cat?cat.label:m.categorie, m.prenom, m.nom||'', m.montant_attendu, m.montant_verse, Math.max(m.montant_attendu-m.montant_verse,0), statusOf(m)==='paid'?'Payé':statusOf(m)==='partial'?'Partiel':'Non payé', m.telephone||'', m.adresse||'', m.memo||''];
   });
   const voyageurRows = [];
   buses.forEach(b=>{ busOccupants(b.id).forEach(v=>{ voyageurRows.push([b.nom, v.nom, v.est_membre?'Membre':'Non-membre', v.telephone||'']); }); });
   exportExcel(`barobe-diackel-sauvegarde-${backupFilenameStamp()}.xlsx`, [
-    {name:'Cotisations', headers:['Catégorie','Prénom','Nom','Attendu','Versé','Reste','Statut','Téléphone'], rows:cotisRows},
+    {name:'Cotisations', headers:['Catégorie','Prénom','Nom','Attendu','Versé','Reste','Statut','Téléphone','Adresse','Mémo'], rows:cotisRows},
     {name:'Wave-OM', headers:['Nom','Opérateur','Montant'], rows:mobilemoney.map(x=>[x.nom,x.operateur,x.montant])},
     {name:'Bonnes volontés', headers:['Nom','Montant','Observation'], rows:bonnesvolontes.map(x=>[x.nom,x.montant,x.observation||''])},
     {name:'Dons en nature', headers:['Donateur','Article'], rows:donsnature.map(x=>[x.donateur,x.article])},
